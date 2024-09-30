@@ -1,12 +1,14 @@
 use nom::{bytes::complete::take, number::complete::le_u8, sequence::pair, IResult};
 use nom_leb128::leb128_u32;
 
+use self::r#type::TypeSection;
+
 mod r#type;
 
 #[derive(Debug)]
 pub enum Section<'a> {
     Custom(&'a [u8]),
-    Type(&'a [u8]),
+    Type(TypeSection),
     Import(&'a [u8]),
     Function(&'a [u8]),
     Table(&'a [u8]),
@@ -48,7 +50,11 @@ impl<'a> Section<'a> {
 
         let section = match code {
             0 => Section::Custom(section_data),
-            1 => Section::Type(section_data),
+            1 => {
+                let type_section = TypeSection::parse(section_data).unwrap().1;
+                println!("{:?}", type_section);
+                Section::Type(type_section)
+            }
             2 => Section::Import(section_data),
             3 => Section::Function(section_data),
             4 => Section::Table(section_data),
@@ -60,10 +66,7 @@ impl<'a> Section<'a> {
             10 => Section::Code(section_data),
             11 => Section::Data(section_data),
             _ => {
-                return Err(nom::Err::Failure(nom::error::Error::new(
-                    input,
-                    nom::error::ErrorKind::Tag,
-                )));
+                panic!("Invalid section type");
             }
         };
 
