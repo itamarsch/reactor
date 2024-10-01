@@ -1,3 +1,5 @@
+use nom::{number::complete::u8, IResult};
+
 #[derive(Debug)]
 pub enum ValueType {
     I32 = 0x7F,
@@ -5,6 +7,14 @@ pub enum ValueType {
     F32 = 0x7D,
     F64 = 0x7C,
 }
+
+impl ValueType {
+    pub fn parse(input: &[u8]) -> IResult<&[u8], ValueType> {
+        let (input, value) = u8(input)?;
+        Ok((input, value.try_into().expect("Invalid value type")))
+    }
+}
+
 impl TryFrom<u8> for ValueType {
     type Error = ();
 

@@ -1,11 +1,14 @@
 use nom::{
     bytes::complete::{tag, take},
-    character::complete::u32,
     IResult,
 };
-use nom_leb128::{leb128_i128, leb128_i32, leb128_u32};
+use nom_leb128::leb128_u32;
 
 use super::value::ValueType;
+
+#[derive(Debug)]
+pub struct FuncTypeIdx(pub u32);
+pub struct FuncIdx(pub u32);
 
 #[derive(Debug)]
 pub struct FuncType {
