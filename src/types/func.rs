@@ -8,6 +8,13 @@ use super::value::ValueType;
 
 #[derive(Debug)]
 pub struct FuncTypeIdx(pub u32);
+impl FuncTypeIdx {
+    pub fn parse(input: &[u8]) -> IResult<&[u8], FuncTypeIdx> {
+        let (input, func_type_index) = leb128_u32(input)?;
+        Ok((input, FuncTypeIdx(func_type_index)))
+    }
+}
+
 pub struct FuncIdx(pub u32);
 
 #[derive(Debug)]

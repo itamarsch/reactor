@@ -2,7 +2,7 @@ use nom::{bytes::complete::tag, multi::many0, IResult};
 use wasmy::{section::Section, VERSION};
 
 fn main() {
-    let file = std::fs::read("./test.wasm").unwrap();
+    let file = std::fs::read("./test2.wasm").unwrap();
     parse_module(&file[..]).unwrap();
 }
 
