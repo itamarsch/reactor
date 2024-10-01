@@ -1,10 +1,13 @@
 use nom::{bytes::complete::take, number::complete::le_u8, sequence::pair, IResult};
 use nom_leb128::leb128_u32;
 
-use self::{function::FunctionSection, import::ImportSection, r#type::TypeSection};
+use self::{
+    function::FunctionSection, import::ImportSection, r#type::TypeSection, table::TableSection,
+};
 
 mod function;
 mod import;
+mod table;
 mod r#type;
 
 #[derive(Debug)]
@@ -13,7 +16,7 @@ pub enum Section<'a> {
     Type(TypeSection),
     Import(ImportSection<'a>),
     Function(FunctionSection),
-    Table(&'a [u8]),
+    Table(TableSection),
     Memory(&'a [u8]),
     Global(&'a [u8]),
     Export(&'a [u8]),
@@ -67,9 +70,15 @@ impl<'a> Section<'a> {
             3 => {
                 let (_, function_section) = FunctionSection::parse(section_data)?;
                 println!("{:#?}", function_section);
+
                 Section::Function(function_section)
             }
-            4 => Section::Table(section_data),
+            4 => {
+                let (_, table_section) = TableSection::parse(section_data)?;
+                println!("{:#?}", table_section);
+
+                Section::Table(table_section)
+            }
             5 => Section::Memory(section_data),
             6 => Section::Global(section_data),
             7 => Section::Export(section_data),

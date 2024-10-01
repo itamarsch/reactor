@@ -1,9 +1,4 @@
-use nom::{
-    bytes::complete::take,
-    multi::{count, many0},
-    number::complete::u8,
-    IResult,
-};
+use nom::{bytes::complete::take, multi::count, number::complete::u8, IResult};
 use nom_leb128::leb128_u32;
 
 use crate::types::{FuncTypeIdx, GlobalType, MemoryType, TableType};
