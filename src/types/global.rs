@@ -1,6 +1,16 @@
 use nom::{number::complete::u8, IResult};
+use nom_leb128::leb128_u32;
 
 use super::ValueType;
+
+#[derive(Debug)]
+pub struct GlobalIdx(u32);
+impl GlobalIdx {
+    pub fn parse(input: &[u8]) -> IResult<&[u8], GlobalIdx> {
+        let (input, global_index) = leb128_u32(input)?;
+        Ok((input, GlobalIdx(global_index)))
+    }
+}
 
 #[derive(Debug)]
 pub struct GlobalType {

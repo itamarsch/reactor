@@ -15,7 +15,14 @@ impl FuncTypeIdx {
     }
 }
 
+#[derive(Debug)]
 pub struct FuncIdx(pub u32);
+impl FuncIdx {
+    pub fn parse(input: &[u8]) -> IResult<&[u8], FuncIdx> {
+        let (input, func_index) = leb128_u32(input)?;
+        Ok((input, FuncIdx(func_index)))
+    }
+}
 
 #[derive(Debug)]
 pub struct FuncType {
