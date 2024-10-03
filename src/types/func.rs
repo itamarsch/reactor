@@ -48,7 +48,6 @@ impl FuncType {
             .copied()
             .map(|e| e.try_into().expect("Invalid functype"))
             .collect();
-
         Ok((input, FuncType { params, returns }))
     }
 }

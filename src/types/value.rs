@@ -1,6 +1,6 @@
 use nom::{number::complete::u8, IResult};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ValueType {
     I32 = 0x7F,
     I64 = 0x7E,

@@ -4,7 +4,7 @@ use nom::{
 };
 use nom_leb128::leb128_u32;
 
-use crate::types::FuncType;
+use crate::types::{wasm_vec, FuncType};
 
 #[derive(Debug)]
 pub struct TypeSection {
@@ -13,10 +13,7 @@ pub struct TypeSection {
 
 impl TypeSection {
     pub fn parse(input: &[u8]) -> IResult<&[u8], TypeSection> {
-        let (input, num_functions) = leb128_u32(input)?;
-
-        let (input, funcs) = count(FuncType::parse, num_functions as usize)(input)?;
-        assert_eq!(num_functions as usize, funcs.len());
+        let (input, funcs) = wasm_vec(FuncType::parse)(input)?;
 
         Ok((input, TypeSection { funcs }))
     }

@@ -1,7 +1,6 @@
-use nom::{multi::count, IResult};
-use nom_leb128::leb128_u32;
+use nom::IResult;
 
-use crate::types::FuncTypeIdx;
+use crate::types::{wasm_vec, FuncTypeIdx};
 
 #[derive(Debug)]
 pub struct FunctionSection {
@@ -10,8 +9,7 @@ pub struct FunctionSection {
 
 impl FunctionSection {
     pub fn parse(input: &[u8]) -> IResult<&[u8], FunctionSection> {
-        let (input, amount_of_functions) = leb128_u32(input)?;
-        let (input, functions) = count(FuncTypeIdx::parse, amount_of_functions as usize)(input)?;
+        let (input, functions) = wasm_vec(FuncTypeIdx::parse)(input)?;
         Ok((input, FunctionSection { functions }))
     }
 }
