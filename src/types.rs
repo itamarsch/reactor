@@ -1,8 +1,10 @@
+mod block_type;
 mod code;
 mod export;
 mod func;
 mod global;
 mod import;
+mod label_index;
 mod limit;
 mod memory;
 mod table;
@@ -26,6 +28,10 @@ pub use import::{Import, ImportDesc};
 
 pub use code::{FunctionCode, Instruction, Locals};
 pub use export::{Export, ExportDesc};
+
+pub use block_type::BlockType;
+
+pub use label_index::LabelIdx;
 
 pub fn wasm_vec<'a, T>(
     mut parse: impl FnMut(&'a [u8]) -> IResult<&'a [u8], T>,
