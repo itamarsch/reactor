@@ -20,3 +20,11 @@ impl Locals {
         ))
     }
 }
+
+#[derive(Debug)]
+pub struct LocalIdx(pub u32);
+impl LocalIdx {
+    pub fn parse(input: &[u8]) -> IResult<&[u8], LocalIdx> {
+        leb128_u32(input).map(|(input, value)| (input, LocalIdx(value)))
+    }
+}

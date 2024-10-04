@@ -26,7 +26,7 @@ pub use value::ValueType;
 
 pub use import::{Import, ImportDesc};
 
-pub use code::{FunctionCode, Instruction, Locals};
+pub use code::{FunctionCode, Instruction, LocalIdx, Locals};
 pub use export::{Export, ExportDesc};
 
 pub use block_type::BlockType;
