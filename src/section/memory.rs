@@ -1,5 +1,4 @@
-use nom::{multi::count, IResult};
-use nom_leb128::leb128_u32;
+use nom::IResult;
 
 use crate::types::{wasm_vec, MemoryType};
 

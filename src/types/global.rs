@@ -7,8 +7,7 @@ use super::ValueType;
 pub struct GlobalIdx(u32);
 impl GlobalIdx {
     pub fn parse(input: &[u8]) -> IResult<&[u8], GlobalIdx> {
-        let (input, global_index) = leb128_u32(input)?;
-        Ok((input, GlobalIdx(global_index)))
+        leb128_u32(input).map(|(input, value)| (input, GlobalIdx(value)))
     }
 }
 

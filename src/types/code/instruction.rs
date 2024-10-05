@@ -1,7 +1,5 @@
 use nom::{
-    bytes::complete::{tag, take_until},
-    combinator::cut,
-    multi::{many0, many_till},
+    bytes::complete::tag,
     number::{
         complete::{f32, f64, u8},
         Endianness,
@@ -11,11 +9,9 @@ use nom::{
 use nom_leb128::{leb128_i32, leb128_i64, leb128_u32};
 
 use crate::types::{
-    wasm_vec, BlockType, ElementIdx, FuncIdx, FuncTypeIdx, GlobalIdx, LabelIdx, RefType, TableIdx,
-    ValueType,
+    wasm_vec, BlockType, ElementIdx, FuncIdx, FuncTypeIdx, GlobalIdx, LabelIdx, LocalIdx,
+    MemoryArgument, RefType, TableIdx, ValueType,
 };
-
-use super::{memory_argument::MemoryArgument, LocalIdx};
 
 #[derive(Debug)]
 pub enum Instruction {

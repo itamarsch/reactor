@@ -7,8 +7,7 @@ use super::Limit;
 pub struct MemoryIdx(u32);
 impl MemoryIdx {
     pub fn parse(input: &[u8]) -> IResult<&[u8], MemoryIdx> {
-        let (input, memory_index) = leb128_u32(input)?;
-        Ok((input, MemoryIdx(memory_index)))
+        leb128_u32(input).map(|(input, value)| (input, MemoryIdx(value)))
     }
 }
 

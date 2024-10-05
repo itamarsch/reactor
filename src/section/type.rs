@@ -1,10 +1,5 @@
-use nom::{
-    multi::{count, many0},
-    IResult,
-};
-use nom_leb128::leb128_u32;
-
 use crate::types::{wasm_vec, FuncType};
+use nom::IResult;
 
 #[derive(Debug)]
 pub struct TypeSection {

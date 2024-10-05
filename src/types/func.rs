@@ -10,8 +10,7 @@ use super::value::ValueType;
 pub struct FuncTypeIdx(pub u32);
 impl FuncTypeIdx {
     pub fn parse(input: &[u8]) -> IResult<&[u8], FuncTypeIdx> {
-        let (input, func_type_index) = leb128_u32(input)?;
-        Ok((input, FuncTypeIdx(func_type_index)))
+        leb128_u32(input).map(|(input, value)| (input, FuncTypeIdx(value)))
     }
 }
 
@@ -19,8 +18,7 @@ impl FuncTypeIdx {
 pub struct FuncIdx(pub u32);
 impl FuncIdx {
     pub fn parse(input: &[u8]) -> IResult<&[u8], FuncIdx> {
-        let (input, func_index) = leb128_u32(input)?;
-        Ok((input, FuncIdx(func_index)))
+        leb128_u32(input).map(|(input, value)| (input, FuncIdx(value)))
     }
 }
 
