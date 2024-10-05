@@ -1,7 +1,7 @@
 use nom::{bytes::complete::tag, IResult};
 use nom_leb128::leb128_u32;
 
-use super::Limit;
+use super::{Limit, RefType};
 
 #[derive(Debug)]
 pub struct TableIdx(u32);
@@ -13,12 +13,12 @@ impl TableIdx {
 }
 
 #[derive(Debug)]
-pub struct TableType(pub Limit);
+pub struct TableType(pub RefType, pub Limit);
 
 impl TableType {
     pub fn parse(input: &[u8]) -> IResult<&[u8], TableType> {
-        let (input, _) = tag([0x70])(input)?;
+        let (input, reftype) = RefType::parse(input)?;
         let (input, limit) = Limit::parse(input)?;
-        Ok((input, TableType(limit)))
+        Ok((input, TableType(reftype, limit)))
     }
 }

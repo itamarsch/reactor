@@ -8,9 +8,12 @@ use nom::{
     },
     IResult,
 };
-use nom_leb128::{leb128_i32, leb128_i64};
+use nom_leb128::{leb128_i32, leb128_i64, leb128_u32};
 
-use crate::types::{wasm_vec, BlockType, FuncIdx, FuncTypeIdx, GlobalIdx, LabelIdx};
+use crate::types::{
+    wasm_vec, BlockType, ElementIdx, FuncIdx, FuncTypeIdx, GlobalIdx, LabelIdx, RefType, TableIdx,
+    ValueType,
+};
 
 use super::{memory_argument::MemoryArgument, LocalIdx};
 
@@ -34,14 +37,18 @@ pub enum Instruction {
     },
     Return,
     Call(FuncIdx),
-    CallIndirect(FuncTypeIdx),
+    CallIndirect(FuncTypeIdx, TableIdx),
     Drop,
     Select,
+    SelectTyped(Vec<ValueType>),
     LocalGet(LocalIdx),
     LocalSet(LocalIdx),
     LocalTee(LocalIdx),
     GlobalGet(GlobalIdx),
     GlobalSet(GlobalIdx),
+
+    TableGet(TableIdx),
+    TableSet(TableIdx),
 
     I32Load(MemoryArgument),
     I64Load(MemoryArgument),
@@ -197,6 +204,17 @@ pub enum Instruction {
     I64ReinterpretF64,
     F32ReinterpretI32,
     F64ReinterpretI64,
+
+    PushNullRef(RefType),
+    RefIsNull,
+    PushFuncRef(FuncIdx),
+
+    TableInit(ElementIdx, TableIdx),
+    ElementDrop(ElementIdx),
+    TableCopy(TableIdx, TableIdx),
+    TableGrow(TableIdx),
+    TableSize(TableIdx),
+    TableFill(TableIdx),
 }
 
 impl Instruction {
@@ -289,11 +307,15 @@ impl Instruction {
             }
             0x11 => {
                 let (input, func_idx) = FuncTypeIdx::parse(input)?;
-                let (input, _) = tag(&[0x00][..])(input)?;
-                (input, Instruction::CallIndirect(func_idx))
+                let (input, table_idx) = TableIdx::parse(input)?;
+                (input, Instruction::CallIndirect(func_idx, table_idx))
             }
             0x1A => (input, Instruction::Drop),
             0x1B => (input, Instruction::Select),
+            0x1C => {
+                let (input, operand_types) = wasm_vec(ValueType::parse)(input)?;
+                (input, Instruction::SelectTyped(operand_types))
+            }
             0x20..=0x22 => {
                 let (input, local_idx) = LocalIdx::parse(input)?;
                 (
@@ -314,6 +336,17 @@ impl Instruction {
                         Instruction::GlobalGet(global_idx)
                     } else {
                         Instruction::GlobalSet(global_idx)
+                    },
+                )
+            }
+            0x25 | 0x26 => {
+                let (input, global_idx) = TableIdx::parse(input)?;
+                (
+                    input,
+                    if value == 0x25 {
+                        Instruction::TableGet(global_idx)
+                    } else {
+                        Instruction::TableSet(global_idx)
                     },
                 )
             }
@@ -496,6 +529,47 @@ impl Instruction {
             0xBD => (input, Instruction::I64ReinterpretF64),
             0xBE => (input, Instruction::F32ReinterpretI32),
             0xBF => (input, Instruction::F64ReinterpretI64),
+            0xD0 => {
+                let (input, ref_type) = RefType::parse(input)?;
+                (input, Instruction::PushNullRef(ref_type))
+            }
+            0xD1 => (input, Instruction::RefIsNull),
+            0xD2 => {
+                let (input, func_idx) = FuncIdx::parse(input)?;
+                (input, Instruction::PushFuncRef(func_idx))
+            }
+            0xFC => {
+                let (input, opcode) = leb128_u32(input)?;
+                match opcode {
+                    12 => {
+                        let (input, element_idx) = ElementIdx::parse(input)?;
+                        let (input, table_idx) = TableIdx::parse(input)?;
+                        (input, Instruction::TableInit(element_idx, table_idx))
+                    }
+                    13 => {
+                        let (input, element_idx) = ElementIdx::parse(input)?;
+                        (input, Instruction::ElementDrop(element_idx))
+                    }
+                    14 => {
+                        let (input, tablie_idx1) = TableIdx::parse(input)?;
+                        let (input, tablie_idx2) = TableIdx::parse(input)?;
+                        (input, Instruction::TableCopy(tablie_idx1, tablie_idx2))
+                    }
+                    15 => {
+                        let (input, table_idx) = TableIdx::parse(input)?;
+                        (input, Instruction::TableGrow(table_idx))
+                    }
+                    16 => {
+                        let (input, table_idx) = TableIdx::parse(input)?;
+                        (input, Instruction::TableSize(table_idx))
+                    }
+                    17 => {
+                        let (input, table_idx) = TableIdx::parse(input)?;
+                        (input, Instruction::TableFill(table_idx))
+                    }
+                    _ => panic!("Unknown instruction: 0x{:x} {}", value, opcode),
+                }
+            }
             _ => panic!("Invalid instruction: 0x{:x}", value),
         };
         println!("{:#?}", instruction);
