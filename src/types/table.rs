@@ -4,7 +4,7 @@ use nom_leb128::leb128_u32;
 use super::{Limit, RefType};
 
 #[derive(Debug)]
-pub struct TableIdx(u32);
+pub struct TableIdx(pub u32);
 impl TableIdx {
     pub fn parse(input: &[u8]) -> IResult<&[u8], TableIdx> {
         leb128_u32(input).map(|(input, value)| (input, TableIdx(value)))

@@ -1,12 +1,16 @@
 use nom::{bytes::complete::take, number::complete::le_u8, sequence::pair, IResult};
 use nom_leb128::leb128_u32;
 
+use crate::types::name;
+
 use self::{
-    code::CodeSection, export::ExportSection, function::FunctionSection, global::GlobalSection,
-    import::ImportSection, memory::MemorySection, r#type::TypeSection, table::TableSection,
+    code::CodeSection, element::ElementSection, export::ExportSection, function::FunctionSection,
+    global::GlobalSection, import::ImportSection, memory::MemorySection, r#type::TypeSection,
+    table::TableSection,
 };
 
 mod code;
+mod element;
 mod export;
 mod function;
 mod global;
@@ -17,7 +21,7 @@ mod r#type;
 
 #[derive(Debug)]
 pub enum Section<'a> {
-    Custom(&'a [u8]),
+    Custom(&'a str, &'a [u8]),
     Type(TypeSection),
     Import(ImportSection<'a>),
     Function(FunctionSection),
@@ -26,7 +30,8 @@ pub enum Section<'a> {
     Global(GlobalSection),
     Export(ExportSection<'a>),
     Start(&'a [u8]),
-    Element(&'a [u8]),
+
+    Element(ElementSection),
     Code(CodeSection),
     Data(&'a [u8]),
 }
@@ -38,9 +43,9 @@ fn parse_section(input: &[u8]) -> IResult<&[u8], (u8, &[u8])> {
 }
 
 impl<'a> Section<'a> {
-    pub fn get_variant(&self) -> &str {
+    pub fn get_variant(&self) -> &'a str {
         match self {
-            Section::Custom(_) => "Custom",
+            Section::Custom(name, _) => name,
             Section::Type(_) => "Type",
             Section::Import(_) => "Import",
             Section::Function(_) => "Function",
@@ -59,7 +64,11 @@ impl<'a> Section<'a> {
         let (input, (code, section_data)) = parse_section(input)?;
 
         let section = match code {
-            0 => Section::Custom(section_data),
+            0 => {
+                let (section_data, name) = name(section_data)?;
+
+                Section::Custom(name, section_data)
+            }
             1 => {
                 let (_, type_section) = TypeSection::parse(section_data)?;
                 println!("{:#?}", type_section);
@@ -101,7 +110,12 @@ impl<'a> Section<'a> {
                 Section::Global(global_section)
             }
             8 => Section::Start(section_data),
-            9 => Section::Element(section_data),
+            9 => {
+                let (_, elements) = ElementSection::parse(section_data)?;
+                println!("{:#?}", elements);
+
+                Section::Element(elements)
+            }
             10 => {
                 let (_, code_section) = CodeSection::parse(section_data)?;
                 println!("{:#?}", code_section);

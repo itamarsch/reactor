@@ -1,4 +1,5 @@
 use nom::{
+    bytes::complete::take,
     error::{ContextError, ParseError},
     multi::count,
     IResult, Parser,
@@ -42,13 +43,20 @@ pub use block_type::BlockType;
 
 pub use label_index::LabelIdx;
 
-pub use element::ElementIdx;
+pub use element::{Element, ElementIdx, ElementMode};
 
 pub use ref_type::RefType;
 
 pub use data::DataIdx;
 
 pub use code::Expr;
+
+pub fn name(input: &[u8]) -> IResult<&[u8], &str> {
+    let (input, name_len) = leb128_u32(input)?;
+    let (input, name) = take(name_len)(input)?;
+    let name = std::str::from_utf8(name).unwrap();
+    Ok((input, name))
+}
 
 pub fn wasm_vec<'a, T, F, E>(mut parse: F) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Vec<T>, E>
 where

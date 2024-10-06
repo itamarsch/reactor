@@ -1,7 +1,7 @@
 use nom::{bytes::complete::take, number::complete::u8, IResult};
 use nom_leb128::leb128_u32;
 
-use super::{FuncIdx, GlobalIdx, MemoryIdx, TableIdx};
+use super::{name, FuncIdx, GlobalIdx, MemoryIdx, TableIdx};
 
 #[derive(Debug)]
 pub struct Export<'a> {
@@ -11,9 +11,7 @@ pub struct Export<'a> {
 
 impl Export<'_> {
     pub fn parse(input: &[u8]) -> IResult<&[u8], Export> {
-        let (input, name_len) = leb128_u32(input)?;
-        let (input, name) = take(name_len)(input)?;
-        let name = std::str::from_utf8(name).unwrap();
+        let (input, name) = name(input)?;
         let (input, desc) = ExportDesc::parse(input)?;
         Ok((input, Export { name, desc }))
     }

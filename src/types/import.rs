@@ -3,6 +3,8 @@ use nom_leb128::leb128_u32;
 
 use crate::types::{FuncTypeIdx, GlobalType, MemoryType, TableType};
 
+use super::name;
+
 #[derive(Debug)]
 pub struct Import<'a> {
     pub mod_name: &'a str,
@@ -21,13 +23,9 @@ pub enum ImportDesc {
 
 impl Import<'_> {
     pub fn parse(input: &[u8]) -> IResult<&[u8], Import> {
-        let (input, mod_name_len) = leb128_u32(input)?;
-        let (input, mod_name) = take(mod_name_len)(input)?;
-        let mod_name = std::str::from_utf8(mod_name).unwrap();
+        let (input, mod_name) = name(input)?;
 
-        let (input, import_name_len) = leb128_u32(input)?;
-        let (input, import_name) = take(import_name_len)(input)?;
-        let import_name = std::str::from_utf8(import_name).unwrap();
+        let (input, import_name) = name(input)?;
 
         let (input, import_type) = u8(input)?;
         let (input, import_desc) = match import_type {
