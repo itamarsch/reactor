@@ -3,6 +3,7 @@ use nom_leb128::leb128_u32;
 
 mod block_type;
 mod code;
+mod data;
 mod element;
 mod export;
 mod func;
@@ -40,6 +41,8 @@ pub use label_index::LabelIdx;
 pub use element::ElementIdx;
 
 pub use ref_type::RefType;
+
+pub use data::DataIdx;
 
 pub fn wasm_vec<'a, T>(
     mut parse: impl FnMut(&'a [u8]) -> IResult<&'a [u8], T>,

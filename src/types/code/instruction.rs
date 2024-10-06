@@ -9,7 +9,7 @@ use nom::{
 use nom_leb128::{leb128_i32, leb128_i64, leb128_u32};
 
 use crate::types::{
-    wasm_vec, BlockType, ElementIdx, FuncIdx, FuncTypeIdx, GlobalIdx, LabelIdx, LocalIdx,
+    wasm_vec, BlockType, DataIdx, ElementIdx, FuncIdx, FuncTypeIdx, GlobalIdx, LabelIdx, LocalIdx,
     MemoryArgument, RefType, TableIdx, ValueType,
 };
 
@@ -200,10 +200,20 @@ pub enum Instruction {
     I64ReinterpretF64,
     F32ReinterpretI32,
     F64ReinterpretI64,
+    I32Extend8S,
+    I32Extend16S,
+    I64Extend8S,
+    I64Extend16S,
+    I64Extend32S,
 
     PushNullRef(RefType),
     RefIsNull,
     PushFuncRef(FuncIdx),
+
+    MemoryInit(DataIdx),
+    DataDrop(DataIdx),
+    Memcpy,
+    Memfill,
 
     TableInit(ElementIdx, TableIdx),
     ElementDrop(ElementIdx),
@@ -525,6 +535,11 @@ impl Instruction {
             0xBD => (input, Instruction::I64ReinterpretF64),
             0xBE => (input, Instruction::F32ReinterpretI32),
             0xBF => (input, Instruction::F64ReinterpretI64),
+            0xC0 => (input, Instruction::I32Extend8S),
+            0xC1 => (input, Instruction::I32Extend16S),
+            0xC2 => (input, Instruction::I64Extend8S),
+            0xC3 => (input, Instruction::I64Extend16S),
+            0xC4 => (input, Instruction::I64Extend32S),
             0xD0 => {
                 let (input, ref_type) = RefType::parse(input)?;
                 (input, Instruction::PushNullRef(ref_type))
@@ -537,6 +552,23 @@ impl Instruction {
             0xFC => {
                 let (input, opcode) = leb128_u32(input)?;
                 match opcode {
+                    8 => {
+                        let (input, data_idx) = DataIdx::parse(input)?;
+                        let (input, _) = tag(&[0][..])(input)?;
+                        (input, Instruction::MemoryInit(data_idx))
+                    }
+                    9 => {
+                        let (input, data_idx) = DataIdx::parse(input)?;
+                        (input, Instruction::DataDrop(data_idx))
+                    }
+                    10 => {
+                        let (input, _) = tag(&[0, 0][..])(input)?;
+                        (input, Instruction::Memcpy)
+                    }
+                    11 => {
+                        let (input, _) = tag(&[0][..])(input)?;
+                        (input, Instruction::Memfill)
+                    }
                     12 => {
                         let (input, element_idx) = ElementIdx::parse(input)?;
                         let (input, table_idx) = TableIdx::parse(input)?;
