@@ -136,7 +136,6 @@ impl Element {
             _ => panic!("Invailid element variant {}", variant),
         };
 
-        println!("{:#?}", element);
         Ok((input, element))
     }
 }

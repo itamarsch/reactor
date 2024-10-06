@@ -32,23 +32,19 @@ impl Import<'_> {
             0x00 => {
                 //Function
                 let (input, func_type_index) = leb128_u32(input)?;
-                println!("IDX: {func_type_index}");
                 (input, ImportDesc::Func(FuncTypeIdx(func_type_index)))
             }
             0x01 => {
                 let (input, table_type) = TableType::parse(input)?;
 
-                println!("{:?}", table_type);
                 (input, ImportDesc::Table(table_type))
             }
             0x02 => {
                 let (input, memory_type) = MemoryType::parse(input)?;
-                println!("{:?}", memory_type);
                 (input, ImportDesc::Memory(memory_type))
             }
             0x03 => {
                 let (input, global_type) = GlobalType::parse(input)?;
-                println!("{:?} {:?}", global_type, input);
                 (input, ImportDesc::Global(global_type))
             }
             _ => {

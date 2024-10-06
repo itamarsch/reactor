@@ -68,74 +68,51 @@ impl<'a> Section<'a> {
         let section = match code {
             0 => {
                 let (section_data, name) = name(section_data)?;
-
                 Section::Custom(name, section_data)
             }
             1 => {
                 let (_, type_section) = TypeSection::parse(section_data)?;
-                println!("{:#?}", type_section);
-
                 Section::Type(type_section)
             }
             2 => {
                 let (_, import_section) = ImportSection::parse(section_data)?;
-                println!("{:#?}", import_section);
-
                 Section::Import(import_section)
             }
             3 => {
                 let (_, function_section) = FunctionSection::parse(section_data)?;
-                println!("{:#?}", function_section);
-
                 Section::Function(function_section)
             }
             4 => {
                 let (_, table_section) = TableSection::parse(section_data)?;
-                println!("{:#?}", table_section);
-
                 Section::Table(table_section)
             }
             5 => {
                 let (_, memory_section) = MemorySection::parse(section_data)?;
-                println!("{:#?}", memory_section);
                 Section::Memory(memory_section)
             }
             7 => {
                 let (_, export_section) = ExportSection::parse(section_data)?;
-                println!("{:#?}", export_section);
                 Section::Export(export_section)
             }
             6 => {
                 let (_, global_section) = GlobalSection::parse(section_data)?;
-                println!("{:#?}", global_section);
-
                 Section::Global(global_section)
             }
             8 => Section::Start(section_data),
             9 => {
                 let (_, elements) = ElementSection::parse(section_data)?;
-                println!("{:#?}", elements);
-
                 Section::Element(elements)
             }
             10 => {
                 let (_, code_section) = CodeSection::parse(section_data)?;
-                println!("{:#?}", code_section);
-
                 Section::Code(code_section)
             }
             11 => {
                 let (_, data_section) = DataSection::parse(section_data)?;
-                println!("{:#?}", data_section);
-
                 Section::Data(data_section)
             }
             12 => {
                 let (_, amount_of_datas) = leb128_u32(section_data)?;
-                println!(
-                    "DataCount Section {{ amount_of_datas: {:?} }}",
-                    amount_of_datas
-                );
                 Section::DataCount(amount_of_datas)
             }
             _ => {
