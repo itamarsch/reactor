@@ -1,4 +1,8 @@
-use nom::{multi::count, IResult};
+use nom::{
+    error::{ContextError, ParseError},
+    multi::count,
+    IResult, Parser,
+};
 use nom_leb128::leb128_u32;
 
 mod block_type;
@@ -46,15 +50,15 @@ pub use data::DataIdx;
 
 pub use code::Expr;
 
-pub fn wasm_vec<'a, T>(
-    mut parse: impl FnMut(&'a [u8]) -> IResult<&'a [u8], T>,
-) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Vec<T>>
+pub fn wasm_vec<'a, T, F, E>(mut parse: F) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Vec<T>, E>
 where
     T: 'a,
+    F: Parser<&'a [u8], T, E>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     move |input| {
         let (input, len) = leb128_u32(input)?;
-        let (input, values) = count(&mut parse, len as usize)(input)?;
+        let (input, values) = count(|input| parse.parse(input), len as usize)(input)?;
         Ok((input, values))
     }
 }
