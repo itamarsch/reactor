@@ -9,16 +9,16 @@ use nom::{
 use nom_leb128::{leb128_i32, leb128_i64, leb128_u32};
 
 use crate::types::{
-    wasm_vec, BlockType, DataIdx, ElementIdx, FuncIdx, FuncTypeIdx, GlobalIdx, LabelIdx, LocalIdx,
-    MemoryArgument, RefType, TableIdx, ValueType,
+    wasm_vec, BlockType, DataIdx, ElementIdx, Expr, FuncIdx, FuncTypeIdx, GlobalIdx, LabelIdx,
+    LocalIdx, MemoryArgument, RefType, TableIdx, ValueType,
 };
 
 #[derive(Debug)]
 pub enum Instruction {
     Unreachable,
     Nop,
-    Block(BlockType, Vec<Instruction>),
-    Loop(BlockType, Vec<Instruction>),
+    Block(BlockType, Expr),
+    Loop(BlockType, Expr),
 
     If {
         block_type: BlockType,
@@ -231,23 +231,14 @@ impl Instruction {
             0x01 => (input, Instruction::Nop),
             0x02 | 0x03 => {
                 let (mut input, block_type) = BlockType::parse(input)?;
-                let mut instructions = vec![];
-                loop {
-                    let instruction;
-                    if input[0] == 0x0B {
-                        (input, _) = tag(&[0x0B][..])(input)?;
-                        break;
-                    }
-                    (input, instruction) = Instruction::parse(input)?;
-                    instructions.push(instruction);
-                }
+                let (input, expr) = Expr::parse(input)?;
 
                 (
                     input,
                     if value == 0x02 {
-                        Instruction::Block(block_type, instructions)
+                        Instruction::Block(block_type, expr)
                     } else {
-                        Instruction::Loop(block_type, instructions)
+                        Instruction::Loop(block_type, expr)
                     },
                 )
             }
@@ -600,7 +591,6 @@ impl Instruction {
             }
             _ => panic!("Invalid instruction: 0x{:x}", value),
         };
-        println!("{:#?}", instruction);
         Ok((input, instruction))
     }
 }

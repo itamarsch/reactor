@@ -44,6 +44,8 @@ pub use ref_type::RefType;
 
 pub use data::DataIdx;
 
+pub use code::Expr;
+
 pub fn wasm_vec<'a, T>(
     mut parse: impl FnMut(&'a [u8]) -> IResult<&'a [u8], T>,
 ) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Vec<T>>
