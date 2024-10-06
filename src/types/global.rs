@@ -4,7 +4,7 @@ use nom_leb128::leb128_u32;
 use super::ValueType;
 
 #[derive(Debug)]
-pub struct GlobalIdx(u32);
+pub struct GlobalIdx(pub u32);
 impl GlobalIdx {
     pub fn parse(input: &[u8]) -> IResult<&[u8], GlobalIdx> {
         leb128_u32(input).map(|(input, value)| (input, GlobalIdx(value)))

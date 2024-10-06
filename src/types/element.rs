@@ -1,4 +1,4 @@
-use nom::{bytes::complete::tag, number::complete::u8, IResult};
+use nom::{bytes::complete::tag, IResult};
 use nom_leb128::leb128_u32;
 
 use super::{wasm_vec, Expr, FuncIdx, Instruction, RefType, TableIdx};

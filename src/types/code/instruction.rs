@@ -230,7 +230,7 @@ impl Instruction {
             0x00 => (input, Instruction::Unreachable),
             0x01 => (input, Instruction::Nop),
             0x02 | 0x03 => {
-                let (mut input, block_type) = BlockType::parse(input)?;
+                let (input, block_type) = BlockType::parse(input)?;
                 let (input, expr) = Expr::parse(input)?;
 
                 (

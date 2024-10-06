@@ -4,19 +4,21 @@ use nom_leb128::leb128_u32;
 use crate::types::name;
 
 use self::{
-    code::CodeSection, data::DataSection, element::ElementSection, export::ExportSection,
-    function::FunctionSection, global::GlobalSection, import::ImportSection, memory::MemorySection,
-    r#type::TypeSection, table::TableSection,
+    code::CodeSection, data::DataSection, data_count::DataCountSection, element::ElementSection,
+    export::ExportSection, function::FunctionSection, global::GlobalSection, import::ImportSection,
+    memory::MemorySection, r#type::TypeSection, start::StartSection, table::TableSection,
 };
 
 mod code;
 mod data;
+mod data_count;
 mod element;
 mod export;
 mod function;
 mod global;
 mod import;
 mod memory;
+mod start;
 mod table;
 mod r#type;
 
@@ -30,12 +32,12 @@ pub enum Section<'a> {
     Memory(MemorySection),
     Global(GlobalSection),
     Export(ExportSection<'a>),
-    Start(&'a [u8]),
+    Start(StartSection),
 
     Element(ElementSection),
     Code(CodeSection),
     Data(DataSection),
-    DataCount(u32),
+    DataCount(DataCountSection),
 }
 
 fn parse_section(input: &[u8]) -> IResult<&[u8], (u8, &[u8])> {
@@ -98,7 +100,10 @@ impl<'a> Section<'a> {
                 let (_, global_section) = GlobalSection::parse(section_data)?;
                 Section::Global(global_section)
             }
-            8 => Section::Start(section_data),
+            8 => {
+                let (_, start_section) = StartSection::parse(section_data)?;
+                Section::Start(start_section)
+            }
             9 => {
                 let (_, elements) = ElementSection::parse(section_data)?;
                 Section::Element(elements)
@@ -112,7 +117,7 @@ impl<'a> Section<'a> {
                 Section::Data(data_section)
             }
             12 => {
-                let (_, amount_of_datas) = leb128_u32(section_data)?;
+                let (_, amount_of_datas) = DataCountSection::parse(section_data)?;
                 Section::DataCount(amount_of_datas)
             }
             _ => {
