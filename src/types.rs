@@ -47,7 +47,7 @@ pub use element::{Element, ElementIdx, ElementMode};
 
 pub use ref_type::RefType;
 
-pub use data::DataIdx;
+pub use data::{Data, DataIdx, DataMode};
 
 pub use code::Expr;
 

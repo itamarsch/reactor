@@ -4,12 +4,13 @@ use nom_leb128::leb128_u32;
 use crate::types::name;
 
 use self::{
-    code::CodeSection, element::ElementSection, export::ExportSection, function::FunctionSection,
-    global::GlobalSection, import::ImportSection, memory::MemorySection, r#type::TypeSection,
-    table::TableSection,
+    code::CodeSection, data::DataSection, element::ElementSection, export::ExportSection,
+    function::FunctionSection, global::GlobalSection, import::ImportSection, memory::MemorySection,
+    r#type::TypeSection, table::TableSection,
 };
 
 mod code;
+mod data;
 mod element;
 mod export;
 mod function;
@@ -33,7 +34,8 @@ pub enum Section<'a> {
 
     Element(ElementSection),
     Code(CodeSection),
-    Data(&'a [u8]),
+    Data(DataSection),
+    DataCount(u32),
 }
 
 fn parse_section(input: &[u8]) -> IResult<&[u8], (u8, &[u8])> {
@@ -57,12 +59,12 @@ impl<'a> Section<'a> {
             Section::Element(_) => "Element",
             Section::Code(_) => "Code",
             Section::Data(_) => "Data",
+            Section::DataCount(_) => "DataCount",
         }
     }
 
     pub fn parse(input: &'a [u8]) -> IResult<&'a [u8], Section<'a>> {
         let (input, (code, section_data)) = parse_section(input)?;
-
         let section = match code {
             0 => {
                 let (section_data, name) = name(section_data)?;
@@ -122,9 +124,22 @@ impl<'a> Section<'a> {
 
                 Section::Code(code_section)
             }
-            11 => Section::Data(section_data),
+            11 => {
+                let (_, data_section) = DataSection::parse(section_data)?;
+                println!("{:#?}", data_section);
+
+                Section::Data(data_section)
+            }
+            12 => {
+                let (_, amount_of_datas) = leb128_u32(section_data)?;
+                println!(
+                    "DataCount Section {{ amount_of_datas: {:?} }}",
+                    amount_of_datas
+                );
+                Section::DataCount(amount_of_datas)
+            }
             _ => {
-                panic!("Invalid section type");
+                panic!("Invalid section type {}", code);
             }
         };
 

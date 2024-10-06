@@ -4,7 +4,7 @@ use nom_leb128::leb128_u32;
 use super::Limit;
 
 #[derive(Debug)]
-pub struct MemoryIdx(u32);
+pub struct MemoryIdx(pub u32);
 impl MemoryIdx {
     pub fn parse(input: &[u8]) -> IResult<&[u8], MemoryIdx> {
         leb128_u32(input).map(|(input, value)| (input, MemoryIdx(value)))
