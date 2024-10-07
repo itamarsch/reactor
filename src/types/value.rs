@@ -5,7 +5,7 @@ use super::RefType;
 #[derive(Debug, Clone, Copy)]
 pub enum ValueType {
     Numeric(NumericValueType),
-    Vector(VectorType),
+    // Vector(VectorType),
     Ref(RefType),
 }
 
@@ -28,7 +28,7 @@ impl TryFrom<u8> for ValueType {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         NumericValueType::try_from(value)
             .map(Self::Numeric)
-            .or_else(|_| VectorType::try_from(value).map(Self::Vector))
+            // .or_else(|_| VectorType::try_from(value).map(Self::Vector))
             .or_else(|_| RefType::try_from(value).map(Self::Ref))
     }
 }

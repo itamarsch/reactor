@@ -31,7 +31,7 @@ pub use memory::{MemoryIdx, MemoryType};
 
 pub use table::{TableIdx, TableType};
 
-pub use value::ValueType;
+pub use value::{NumericValueType, ValueType};
 
 pub use import::{Import, ImportDesc};
 

@@ -1,9 +1,8 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-    runtime::local::Local,
     section::{import::ImportSection, Section, SectionType},
-    types::{FuncIdx, FuncType, FunctionCode, ImportDesc, Locals},
+    types::{FuncIdx, FuncType, FunctionCode, ImportDesc},
 };
 
 #[derive(Debug)]
@@ -25,8 +24,8 @@ pub enum Function<'a> {
     Imported(ImportedFunction<'a>),
 }
 
-pub fn take_functions<'a, 'b>(
-    sections: &'b mut HashMap<SectionType<'a>, Section<'a>>,
+pub fn take_functions<'a>(
+    sections: &mut HashMap<SectionType<'a>, Section<'a>>,
 ) -> Vec<Function<'a>> {
     let type_section = sections.remove(&SectionType::Type);
 

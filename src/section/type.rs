@@ -18,6 +18,6 @@ impl TypeSection {
     }
 
     pub fn get_function_type(&self, FuncTypeIdx(idx): FuncTypeIdx) -> Option<Rc<FuncType>> {
-        self.funcs.get(idx as usize).map(|e| e.clone())
+        self.funcs.get(idx as usize).cloned()
     }
 }
