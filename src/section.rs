@@ -22,6 +22,24 @@ pub mod start;
 pub mod table;
 pub mod r#type;
 
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub enum SectionType<'a> {
+    Custom(&'a str),
+    Type,
+    Import,
+    Function,
+    Table,
+    Memory,
+    Global,
+    Export,
+    Start,
+
+    Element,
+    Code,
+    Data,
+    DataCount,
+}
+
 #[derive(Debug)]
 pub enum Section<'a> {
     Custom(&'a str, &'a [u8]),
@@ -47,21 +65,21 @@ fn parse_section(input: &[u8]) -> IResult<&[u8], (u8, &[u8])> {
 }
 
 impl<'a> Section<'a> {
-    pub fn get_variant(&self) -> &'a str {
+    pub fn get_variant(&self) -> SectionType<'a> {
         match self {
-            Section::Custom(name, _) => name,
-            Section::Type(_) => "Type",
-            Section::Import(_) => "Import",
-            Section::Function(_) => "Function",
-            Section::Table(_) => "Table",
-            Section::Memory(_) => "Memory",
-            Section::Global(_) => "Global",
-            Section::Export(_) => "Export",
-            Section::Start(_) => "Start",
-            Section::Element(_) => "Element",
-            Section::Code(_) => "Code",
-            Section::Data(_) => "Data",
-            Section::DataCount(_) => "DataCount",
+            Section::Custom(name, _) => SectionType::Custom(name),
+            Section::Type(_) => SectionType::Type,
+            Section::Import(_) => SectionType::Import,
+            Section::Function(_) => SectionType::Function,
+            Section::Table(_) => SectionType::Table,
+            Section::Memory(_) => SectionType::Memory,
+            Section::Global(_) => SectionType::Global,
+            Section::Export(_) => SectionType::Export,
+            Section::Start(_) => SectionType::Start,
+            Section::Element(_) => SectionType::Element,
+            Section::Code(_) => SectionType::Code,
+            Section::Data(_) => SectionType::Data,
+            Section::DataCount(_) => SectionType::DataCount,
         }
     }
 

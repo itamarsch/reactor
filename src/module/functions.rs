@@ -1,7 +1,7 @@
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-    section::{import::ImportSection, Section},
+    section::{import::ImportSection, Section, SectionType},
     types::{FuncIdx, FuncType, FunctionCode, ImportDesc},
 };
 
@@ -24,21 +24,14 @@ pub enum Function<'a> {
     Imported(ImportedFunction<'a>),
 }
 
-pub fn take_functions<'a, 'b>(sections: &'b mut Vec<Section<'a>>) -> Vec<Function<'a>> {
-    let type_section = sections
-        .iter()
-        .position(|e| matches!(e, Section::Type(_)))
-        .map(|i| sections.remove(i));
+pub fn take_functions<'a, 'b>(
+    sections: &'b mut HashMap<SectionType<'a>, Section<'a>>,
+) -> Vec<Function<'a>> {
+    let type_section = sections.remove(&SectionType::Type);
 
-    let function_section = sections
-        .iter()
-        .position(|e| matches!(e, Section::Function(_)))
-        .map(|i| sections.remove(i));
+    let function_section = sections.remove(&SectionType::Function);
 
-    let code_section = sections
-        .iter()
-        .position(|e| matches!(e, Section::Code(_)))
-        .map(|i| sections.remove(i));
+    let code_section = sections.remove(&SectionType::Code);
 
     if type_section.is_none() && function_section.is_none() && code_section.is_none() {
         return vec![];
@@ -50,12 +43,10 @@ pub fn take_functions<'a, 'b>(sections: &'b mut Vec<Section<'a>>) -> Vec<Functio
         Some(Section::Code(code_section)),
     ) = (type_section, function_section, code_section)
     {
-        let imports = sections.iter_mut().find_map(|e| match e {
-            Section::Import(imports) => Some(imports),
-            _ => None,
-        });
+        let imports = sections.get_mut(&SectionType::Import);
 
-        let mut imported_functions = if let Some(ImportSection(imports)) = imports {
+        let mut imported_functions = if let Some(Section::Import(ImportSection(imports))) = imports
+        {
             let mut imported_functions = vec![];
             for import in imports {
                 match import.desc {
