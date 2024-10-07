@@ -17,7 +17,6 @@ pub enum ImportDesc {
     Func(FuncTypeIdx),
     Table(TableType),
     Memory(MemoryType),
-
     Global(GlobalType),
 }
 

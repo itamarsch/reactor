@@ -9,18 +9,18 @@ use self::{
     memory::MemorySection, r#type::TypeSection, start::StartSection, table::TableSection,
 };
 
-mod code;
-mod data;
-mod data_count;
-mod element;
-mod export;
-mod function;
-mod global;
-mod import;
-mod memory;
-mod start;
-mod table;
-mod r#type;
+pub mod code;
+pub mod data;
+pub mod data_count;
+pub mod element;
+pub mod export;
+pub mod function;
+pub mod global;
+pub mod import;
+pub mod memory;
+pub mod start;
+pub mod table;
+pub mod r#type;
 
 #[derive(Debug)]
 pub enum Section<'a> {

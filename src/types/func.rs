@@ -6,7 +6,7 @@ use nom_leb128::leb128_u32;
 
 use super::value::ValueType;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct FuncTypeIdx(pub u32);
 impl FuncTypeIdx {
     pub fn parse(input: &[u8]) -> IResult<&[u8], FuncTypeIdx> {
@@ -22,7 +22,7 @@ impl FuncIdx {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FuncType {
     pub params: Vec<ValueType>,
     pub returns: Vec<ValueType>,
