@@ -22,8 +22,31 @@ impl Stack {
         }
     }
 
+    pub fn push_value(&mut self, value: Value) {
+        self.stack.push(StackValue::Value(value));
+    }
+    pub fn pop_value(&mut self) -> Value {
+        if let Some(StackValue::Value(value)) = self.stack.pop() {
+            value
+        } else {
+            panic!("Tried popping value from stack but failed")
+        }
+    }
+
     pub fn push_function_state(&mut self, function_state: FunctionState) {
         self.stack.push(StackValue::Function(function_state))
+    }
+
+    pub fn pop_function_state(&mut self) -> FunctionState {
+        if let Some(StackValue::Function(value)) = self.stack.pop() {
+            value
+        } else {
+            panic!("Tried popping value from stack but failed")
+        }
+    }
+
+    pub fn drop(&mut self) {
+        self.stack.pop();
     }
 }
 

@@ -5,11 +5,11 @@ use nom::{
 };
 use nom_leb128::leb128_u32;
 
-use super::{instruction::Instruction, local::Locals};
+use super::{instruction::Instruction, local::LocalTypes};
 
 #[derive(Debug)]
 pub struct FunctionCode {
-    pub locals: Locals,
+    pub locals: LocalTypes,
     pub instructions: Vec<Instruction>,
 }
 
@@ -18,7 +18,7 @@ impl FunctionCode {
         let (input, size) = leb128_u32(input)?;
         let (rest, input) = take(size as usize - 1)(input)?;
 
-        let (input, locals) = Locals::parse(input)?;
+        let (input, locals) = LocalTypes::parse(input)?;
 
         let (input, instructions) = many0(Instruction::parse)(input)?;
         assert!(input.is_empty());

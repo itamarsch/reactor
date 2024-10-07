@@ -6,6 +6,10 @@ pub struct Local {
 }
 
 impl Local {
+    pub fn value(&self) -> Value {
+        self.value
+    }
+
     pub fn from_i32(value: i32) -> Local {
         Local {
             value: Value::I32(value),
