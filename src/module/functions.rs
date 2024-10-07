@@ -24,7 +24,7 @@ pub enum Function<'a> {
     Imported(ImportedFunction<'a>),
 }
 
-pub fn take_functions(mut sections: Vec<Section>) -> Vec<Function> {
+pub fn take_functions<'a, 'b>(sections: &'b mut Vec<Section<'a>>) -> Vec<Function<'a>> {
     let type_section = sections
         .iter()
         .position(|e| matches!(e, Section::Type(_)))
