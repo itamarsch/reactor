@@ -88,7 +88,6 @@ pub fn take_functions<'a, 'b>(
             .collect::<Vec<_>>();
 
         imported_functions.extend(functions);
-        println!("{:#?}", imported_functions);
         imported_functions
     } else {
         panic!("Invalid function sections some missing")
