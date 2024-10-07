@@ -10,7 +10,7 @@ use self::{
     start::get_starting_function_index,
 };
 
-mod functions;
+pub mod functions;
 mod start;
 
 #[derive(Debug)]
@@ -28,5 +28,17 @@ impl<'t> Module<'t> {
             functions,
             start: starting_point,
         }
+    }
+
+    pub fn get_starting_function(&self) -> (FuncIdx, &Function) {
+        (
+            self.start,
+            self.get_function(self.start)
+                .expect("starting index should be valid"),
+        )
+    }
+
+    pub fn get_function(&self, FuncIdx(idx): FuncIdx) -> Option<&Function> {
+        self.functions.get(idx as usize)
     }
 }

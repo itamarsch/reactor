@@ -1,8 +1,9 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
+    runtime::local::Local,
     section::{import::ImportSection, Section, SectionType},
-    types::{FuncIdx, FuncType, FunctionCode, ImportDesc},
+    types::{FuncIdx, FuncType, FunctionCode, ImportDesc, Locals},
 };
 
 #[derive(Debug)]

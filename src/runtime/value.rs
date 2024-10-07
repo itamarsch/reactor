@@ -1,5 +1,6 @@
 use crate::types::FuncIdx;
 
+#[derive(Debug)]
 pub enum Value {
     I32(i32),
     I64(i64),
