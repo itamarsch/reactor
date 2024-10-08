@@ -12,8 +12,8 @@ use crate::{
         functions::{Function, LocalFunction},
         Module,
     },
-    runtime::locals::Locals,
-    types::{FuncIdx, Instruction},
+    runtime::{locals::Locals, value::Value},
+    types::{FuncIdx, Instruction, NumericValueType, ValueType},
 };
 
 use self::{function_state::FunctionState, stack::Stack};
@@ -104,7 +104,7 @@ impl<'a> Runtime<'a> {
             "Executing: {:?}, current state: {:?}, stack: {:?}",
             instruction,
             self.current_function_state.borrow(),
-            () // self.stack.borrow()
+            self.stack.borrow()
         );
         match instruction {
             Instruction::Call(func_idx) => {
@@ -137,59 +137,59 @@ impl<'a> Runtime<'a> {
                 self.stack.borrow_mut().push_f64(*value);
             }
             Instruction::I32Add => {
-                let a = self.stack.borrow_mut().pop_i32();
                 let b = self.stack.borrow_mut().pop_i32();
+                let a = self.stack.borrow_mut().pop_i32();
 
                 self.stack.borrow_mut().push_i32(a.wrapping_add(b));
             }
             Instruction::I32RemS => {
-                let a = self.stack.borrow_mut().pop_i32();
                 let b = self.stack.borrow_mut().pop_i32();
+                let a = self.stack.borrow_mut().pop_i32();
                 self.stack.borrow_mut().push_i32(a % b);
             }
             Instruction::I32Mul => {
-                let a = self.stack.borrow_mut().pop_i32();
                 let b = self.stack.borrow_mut().pop_i32();
+                let a = self.stack.borrow_mut().pop_i32();
 
                 self.stack.borrow_mut().push_i32(a.wrapping_mul(b));
             }
             Instruction::I64Add => {
-                let a = self.stack.borrow_mut().pop_i64();
                 let b = self.stack.borrow_mut().pop_i64();
+                let a = self.stack.borrow_mut().pop_i64();
                 self.stack.borrow_mut().push_i64(a.wrapping_add(b));
             }
             Instruction::I64Sub => {
-                let a = self.stack.borrow_mut().pop_i64();
                 let b = self.stack.borrow_mut().pop_i64();
+                let a = self.stack.borrow_mut().pop_i64();
 
                 self.stack.borrow_mut().push_i64(a.wrapping_sub(b));
             }
             Instruction::I64Mul => {
-                let a = self.stack.borrow_mut().pop_i64();
                 let b = self.stack.borrow_mut().pop_i64();
+                let a = self.stack.borrow_mut().pop_i64();
 
                 self.stack.borrow_mut().push_i64(a.wrapping_mul(b));
             }
             Instruction::I64ShrS => {
-                let a = self.stack.borrow_mut().pop_i64();
                 let b = self.stack.borrow_mut().pop_i64();
+                let a = self.stack.borrow_mut().pop_i64();
                 self.stack.borrow_mut().push_i64(a >> (b % 64));
             }
             Instruction::I64Shl => {
-                let a = self.stack.borrow_mut().pop_i64();
                 let b = self.stack.borrow_mut().pop_i64();
+                let a = self.stack.borrow_mut().pop_i64();
                 self.stack.borrow_mut().push_i64(a << (b % 64));
             }
 
             Instruction::F32Sub => {
-                let a = self.stack.borrow_mut().pop_f32();
                 let b = self.stack.borrow_mut().pop_f32();
+                let a = self.stack.borrow_mut().pop_f32();
 
                 self.stack.borrow_mut().push_f32(a - b);
             }
             Instruction::F32Mul => {
-                let a = self.stack.borrow_mut().pop_f32();
                 let b = self.stack.borrow_mut().pop_f32();
+                let a = self.stack.borrow_mut().pop_f32();
 
                 self.stack.borrow_mut().push_f32(a * b);
             }
@@ -198,20 +198,20 @@ impl<'a> Runtime<'a> {
                 self.stack.borrow_mut().push_f32(a.sqrt());
             }
             Instruction::F64Add => {
-                let a = self.stack.borrow_mut().pop_f64();
                 let b = self.stack.borrow_mut().pop_f64();
+                let a = self.stack.borrow_mut().pop_f64();
 
                 self.stack.borrow_mut().push_f64(a + b);
             }
             Instruction::F64Sub => {
-                let a = self.stack.borrow_mut().pop_f64();
                 let b = self.stack.borrow_mut().pop_f64();
+                let a = self.stack.borrow_mut().pop_f64();
 
                 self.stack.borrow_mut().push_f64(a - b);
             }
             Instruction::F64Div => {
-                let a = self.stack.borrow_mut().pop_f64();
                 let b = self.stack.borrow_mut().pop_f64();
+                let a = self.stack.borrow_mut().pop_f64();
 
                 self.stack.borrow_mut().push_f64(a / b);
             }
@@ -256,6 +256,22 @@ impl<'a> Runtime<'a> {
             returns.push(value);
         }
 
+        for (signature, value) in current_function
+            .signature
+            .returns
+            .iter()
+            .zip(returns.iter().rev())
+        {
+            match (signature, value) {
+                (ValueType::Numeric(NumericValueType::I32), Value::I32(_))
+                | (ValueType::Numeric(NumericValueType::I64), Value::I64(_))
+                | (ValueType::Numeric(NumericValueType::F32), Value::F32(_))
+                | (ValueType::Numeric(NumericValueType::F64), Value::F64(_)) => {}
+                _ => {
+                    panic!("Returns don't match signature of function, expected value of type: {:?} received: {:?}", signature, value);
+                }
+            }
+        }
         let function_state = self.stack.borrow_mut().pop_function_state();
         for _ in 0..amount_of_returns {
             self.stack
