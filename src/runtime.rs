@@ -1,12 +1,14 @@
 use std::{
-    borrow::{Borrow, BorrowMut},
     cell::{Cell, RefCell},
     ops::DerefMut,
     process::exit,
 };
 
 use crate::{
-    module::{functions::Function, Module},
+    module::{
+        functions::{Function, LocalFunction},
+        Module,
+    },
     runtime::locals::Locals,
     types::{FuncIdx, Instruction},
 };
@@ -94,6 +96,56 @@ impl<'a> Runtime<'a> {
         }
     }
 
+    fn run_instruction(&self, instruction: &Instruction) {
+        println!(
+            "Executing: {:?}, current state: {:?}, stack: {:?}",
+            instruction,
+            self.current_function_state,
+            self.stack.borrow()
+        );
+        match instruction {
+            Instruction::I32Const(value) => {
+                self.stack.borrow_mut().push_i32(*value);
+            }
+            Instruction::I32Add => {
+                let a = self.stack.borrow_mut().pop_i32();
+                let b = self.stack.borrow_mut().pop_i32();
+                self.stack.borrow_mut().push_i32(a.wrapping_add(b));
+            }
+            Instruction::LocalGet(idx) => {
+                let value = self.current_function_state.borrow().get_value(*idx);
+                self.stack.borrow_mut().push_value(value);
+            }
+            Instruction::Drop => {
+                self.stack.borrow_mut().drop();
+            }
+            Instruction::Call(func_idx) => {
+                self.call_function(*func_idx);
+            }
+            _ => panic!(
+                "Instruction: {:?} not implemented {:?}",
+                instruction, self.stack
+            ),
+        }
+    }
+
+    fn return_from_function(&self, current_function: &LocalFunction) {
+        let amount_of_returns = current_function.signature.returns.len();
+        let mut returns = Vec::with_capacity(amount_of_returns);
+        for _ in 0..amount_of_returns {
+            returns.push(self.stack.borrow_mut().pop_value());
+        }
+
+        let function_state = self.stack.borrow_mut().pop_function_state();
+        for _ in 0..amount_of_returns {
+            self.stack
+                .borrow_mut()
+                .push_value(returns.pop().expect("Pushed enough elements"));
+        }
+        *self.current_function_state.borrow_mut() = function_state;
+        self.function_depth.set(self.function_depth.get() - 1);
+    }
+
     pub fn execute(self) {
         loop {
             let Some(Function::Local(current_function)) = self
@@ -106,56 +158,14 @@ impl<'a> Runtime<'a> {
             };
             let instruction = &current_function.code.instructions
                 [self.current_function_state.borrow().instruction_index()];
-            println!(
-                "Executing: {:?}, current state: {:?}, stack: {:?}",
-                instruction,
-                self.current_function_state,
-                self.stack.borrow()
-            );
             self.current_function_state.borrow_mut().next_instruction();
-            match instruction {
-                Instruction::I32Const(value) => {
-                    self.stack.borrow_mut().push_i32(*value);
-                }
-                Instruction::I32Add => {
-                    let a = self.stack.borrow_mut().pop_i32();
-                    let b = self.stack.borrow_mut().pop_i32();
-                    self.stack.borrow_mut().push_i32(a.wrapping_add(b));
-                }
-                Instruction::LocalGet(idx) => {
-                    let value = self.current_function_state.borrow().get_value(*idx);
-                    self.stack.borrow_mut().push_value(value);
-                }
-                Instruction::Drop => {
-                    self.stack.borrow_mut().drop();
-                }
-                Instruction::Call(func_idx) => {
-                    self.call_function(*func_idx);
-                }
-                _ => panic!(
-                    "Instruction: {:?} not implemented {:?}",
-                    instruction, self.stack
-                ),
-            }
+            self.run_instruction(instruction);
 
             if self.current_function_state.borrow().instruction_index()
                 == current_function.code.instructions.len()
             {
                 if self.function_depth.get() > 0 {
-                    let amount_of_returns = current_function.signature.returns.len();
-                    let mut returns = Vec::with_capacity(amount_of_returns);
-                    for _ in 0..amount_of_returns {
-                        returns.push(self.stack.borrow_mut().pop_value());
-                    }
-
-                    let function_state = self.stack.borrow_mut().pop_function_state();
-                    for _ in 0..amount_of_returns {
-                        self.stack
-                            .borrow_mut()
-                            .push_value(returns.pop().expect("Pushed enough elements"));
-                    }
-                    *self.current_function_state.borrow_mut() = function_state;
-                    self.function_depth.set(self.function_depth.get() - 1);
+                    self.return_from_function(current_function);
                 } else {
                     break;
                 }
