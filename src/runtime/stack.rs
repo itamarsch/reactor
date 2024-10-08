@@ -14,11 +14,47 @@ impl Stack {
         self.stack.push(StackValue::Value(Value::I32(value)))
     }
 
+    pub fn push_i64(&mut self, value: i64) {
+        self.stack.push(StackValue::Value(Value::I64(value)))
+    }
+
+    pub fn push_f32(&mut self, value: f32) {
+        self.stack.push(StackValue::Value(Value::F32(value)))
+    }
+
+    pub fn push_f64(&mut self, value: f64) {
+        self.stack.push(StackValue::Value(Value::F64(value)))
+    }
+
     pub fn pop_i32(&mut self) -> i32 {
         if let Some(StackValue::Value(Value::I32(value))) = self.stack.pop() {
             value
         } else {
             panic!("Tried popping i32 from stack but failed")
+        }
+    }
+
+    pub fn pop_i64(&mut self) -> i64 {
+        if let Some(StackValue::Value(Value::I64(value))) = self.stack.pop() {
+            value
+        } else {
+            panic!("Tried popping i64 from stack but failed")
+        }
+    }
+
+    pub fn pop_f32(&mut self) -> f32 {
+        if let Some(StackValue::Value(Value::F32(value))) = self.stack.pop() {
+            value
+        } else {
+            panic!("Tried popping f32 from stack but failed")
+        }
+    }
+
+    pub fn pop_f64(&mut self) -> f64 {
+        if let Some(StackValue::Value(Value::F64(value))) = self.stack.pop() {
+            value
+        } else {
+            panic!("Tried popping f64 from stack but failed")
         }
     }
 

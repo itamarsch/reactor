@@ -1,8 +1,11 @@
 use std::{
+    borrow::Borrow,
     cell::{Cell, RefCell},
-    ops::DerefMut,
+    ops::{DerefMut, Shl},
     process::exit,
 };
+
+use nom::ParseTo;
 
 use crate::{
     module::{
@@ -100,27 +103,142 @@ impl<'a> Runtime<'a> {
         println!(
             "Executing: {:?}, current state: {:?}, stack: {:?}",
             instruction,
-            self.current_function_state,
-            self.stack.borrow()
+            self.current_function_state.borrow(),
+            () // self.stack.borrow()
         );
         match instruction {
-            Instruction::I32Const(value) => {
-                self.stack.borrow_mut().push_i32(*value);
-            }
-            Instruction::I32Add => {
-                let a = self.stack.borrow_mut().pop_i32();
-                let b = self.stack.borrow_mut().pop_i32();
-                self.stack.borrow_mut().push_i32(a.wrapping_add(b));
-            }
-            Instruction::LocalGet(idx) => {
-                let value = self.current_function_state.borrow().get_value(*idx);
-                self.stack.borrow_mut().push_value(value);
+            Instruction::Call(func_idx) => {
+                self.call_function(*func_idx);
             }
             Instruction::Drop => {
                 self.stack.borrow_mut().drop();
             }
-            Instruction::Call(func_idx) => {
-                self.call_function(*func_idx);
+            Instruction::LocalGet(idx) => {
+                let value = self.current_function_state.borrow().get_local_value(*idx);
+                self.stack.borrow_mut().push_value(value);
+            }
+            Instruction::LocalSet(idx) => {
+                let value = self.stack.borrow_mut().pop_value();
+                self.current_function_state
+                    .borrow_mut()
+                    .set_local_value(*idx, value);
+            }
+
+            Instruction::I32Const(value) => {
+                self.stack.borrow_mut().push_i32(*value);
+            }
+            Instruction::I64Const(value) => {
+                self.stack.borrow_mut().push_i64(*value);
+            }
+            Instruction::F32Const(value) => {
+                self.stack.borrow_mut().push_f32(*value);
+            }
+            Instruction::F64Const(value) => {
+                self.stack.borrow_mut().push_f64(*value);
+            }
+            Instruction::I32Add => {
+                let a = self.stack.borrow_mut().pop_i32();
+                let b = self.stack.borrow_mut().pop_i32();
+
+                self.stack.borrow_mut().push_i32(a.wrapping_add(b));
+            }
+            Instruction::I32RemS => {
+                let a = self.stack.borrow_mut().pop_i32();
+                let b = self.stack.borrow_mut().pop_i32();
+                self.stack.borrow_mut().push_i32(a % b);
+            }
+            Instruction::I32Mul => {
+                let a = self.stack.borrow_mut().pop_i32();
+                let b = self.stack.borrow_mut().pop_i32();
+
+                self.stack.borrow_mut().push_i32(a.wrapping_mul(b));
+            }
+            Instruction::I64Add => {
+                let a = self.stack.borrow_mut().pop_i64();
+                let b = self.stack.borrow_mut().pop_i64();
+                self.stack.borrow_mut().push_i64(a.wrapping_add(b));
+            }
+            Instruction::I64Sub => {
+                let a = self.stack.borrow_mut().pop_i64();
+                let b = self.stack.borrow_mut().pop_i64();
+
+                self.stack.borrow_mut().push_i64(a.wrapping_sub(b));
+            }
+            Instruction::I64Mul => {
+                let a = self.stack.borrow_mut().pop_i64();
+                let b = self.stack.borrow_mut().pop_i64();
+
+                self.stack.borrow_mut().push_i64(a.wrapping_mul(b));
+            }
+            Instruction::I64ShrS => {
+                let a = self.stack.borrow_mut().pop_i64();
+                let b = self.stack.borrow_mut().pop_i64();
+                self.stack.borrow_mut().push_i64(a >> (b % 64));
+            }
+            Instruction::I64Shl => {
+                let a = self.stack.borrow_mut().pop_i64();
+                let b = self.stack.borrow_mut().pop_i64();
+                self.stack.borrow_mut().push_i64(a << (b % 64));
+            }
+
+            Instruction::F32Sub => {
+                let a = self.stack.borrow_mut().pop_f32();
+                let b = self.stack.borrow_mut().pop_f32();
+
+                self.stack.borrow_mut().push_f32(a - b);
+            }
+            Instruction::F32Mul => {
+                let a = self.stack.borrow_mut().pop_f32();
+                let b = self.stack.borrow_mut().pop_f32();
+
+                self.stack.borrow_mut().push_f32(a * b);
+            }
+            Instruction::F32Sqrt => {
+                let a = self.stack.borrow_mut().pop_f32();
+                self.stack.borrow_mut().push_f32(a.sqrt());
+            }
+            Instruction::F64Add => {
+                let a = self.stack.borrow_mut().pop_f64();
+                let b = self.stack.borrow_mut().pop_f64();
+
+                self.stack.borrow_mut().push_f64(a + b);
+            }
+            Instruction::F64Sub => {
+                let a = self.stack.borrow_mut().pop_f64();
+                let b = self.stack.borrow_mut().pop_f64();
+
+                self.stack.borrow_mut().push_f64(a - b);
+            }
+            Instruction::F64Div => {
+                let a = self.stack.borrow_mut().pop_f64();
+                let b = self.stack.borrow_mut().pop_f64();
+
+                self.stack.borrow_mut().push_f64(a / b);
+            }
+
+            Instruction::I32WrapI64 => {
+                let a = self.stack.borrow_mut().pop_i64();
+                self.stack.borrow_mut().push_i32(a as i32);
+            }
+            Instruction::I32TruncF32S => {
+                let a = self.stack.borrow_mut().pop_f32();
+                self.stack.borrow_mut().push_i32(a as i32);
+            }
+            Instruction::I32TruncF64S => {
+                let a = self.stack.borrow_mut().pop_f64();
+                self.stack.borrow_mut().push_i32(a as i32);
+            }
+            Instruction::I64ExtendI32S => {
+                let a = self.stack.borrow_mut().pop_i32();
+                self.stack.borrow_mut().push_i64(a as i64);
+            }
+            Instruction::I64TruncF32S => {
+                let a = self.stack.borrow_mut().pop_f32();
+                self.stack.borrow_mut().push_i64(a as i64);
+            }
+            Instruction::F32ConvertI32S => {
+                let a = self.stack.borrow_mut().pop_i32();
+                self.stack.borrow_mut().push_f32(a as f32);
             }
             _ => panic!(
                 "Instruction: {:?} not implemented {:?}",
@@ -133,7 +251,9 @@ impl<'a> Runtime<'a> {
         let amount_of_returns = current_function.signature.returns.len();
         let mut returns = Vec::with_capacity(amount_of_returns);
         for _ in 0..amount_of_returns {
-            returns.push(self.stack.borrow_mut().pop_value());
+            let value = self.stack.borrow_mut().pop_value();
+            println!("{}, {:?}", amount_of_returns, value);
+            returns.push(value);
         }
 
         let function_state = self.stack.borrow_mut().pop_function_state();
@@ -156,20 +276,23 @@ impl<'a> Runtime<'a> {
                     "Current runing function cannot be imported and its index has to exist"
                 )
             };
-            let instruction = &current_function.code.instructions
-                [self.current_function_state.borrow().instruction_index()];
-            self.current_function_state.borrow_mut().next_instruction();
-            self.run_instruction(instruction);
 
             if self.current_function_state.borrow().instruction_index()
                 == current_function.code.instructions.len()
             {
                 if self.function_depth.get() > 0 {
                     self.return_from_function(current_function);
+                    continue;
                 } else {
                     break;
                 }
             }
+
+            let instruction = &current_function.code.instructions
+                [self.current_function_state.borrow().instruction_index()];
+            self.current_function_state.borrow_mut().next_instruction();
+
+            self.run_instruction(instruction);
         }
     }
 }
