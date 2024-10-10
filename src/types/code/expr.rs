@@ -4,7 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use nom::{bytes::complete::tag, IResult};
+use nom::{bytes::complete::tag, number::complete::u8, IResult};
 
 use crate::runtime::function_state::InstructionIndex;
 
@@ -78,7 +78,7 @@ impl Instructions {
             let instruction;
             let end = reached_end(input[0]);
             if end.0 {
-                (input, _) = tag(&[0x0B][..])(input)?;
+                (input, _) = u8(input)?;
                 break end.1;
             }
             (input, instruction) = Instruction::parse(input, blocks.clone())?;

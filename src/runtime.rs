@@ -98,6 +98,18 @@ impl<'a> Runtime<'a> {
             Instruction::Block(block_type, block_idx) => {
                 self.execute_block(*block_idx, *block_type)
             }
+            Instruction::If {
+                block_type,
+                if_expr,
+                else_expr,
+            } => {
+                let condition = self.stack.borrow_mut().pop_bool();
+                if condition {
+                    self.execute_block(*if_expr, *block_type);
+                } else {
+                    self.execute_block(*else_expr, *block_type);
+                }
+            }
             Instruction::Call(func_idx) => {
                 self.call_function(*func_idx);
             }

@@ -26,6 +26,11 @@ impl Stack {
         self.stack.push(StackValue::Value(Value::F64(value)))
     }
 
+    pub fn pop_bool(&mut self) -> bool {
+        let value = self.pop_i32();
+        value != 0
+    }
+
     pub fn pop_i32(&mut self) -> i32 {
         if let Some(StackValue::Value(Value::I32(value))) = self.stack.pop() {
             value

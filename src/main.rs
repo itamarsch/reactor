@@ -33,6 +33,7 @@ fn parse_module(input: &[u8]) -> IResult<&[u8], HashMap<SectionType, Section>> {
             panic!("Duplicate sections")
         }
     }
+    assert!(input.is_empty(), "{:?}", input);
 
     Ok((input, sections_hashmap))
 }
