@@ -1,3 +1,5 @@
+use std::{cell::RefCell, ops::Deref, rc::Rc};
+
 use nom::{
     bytes::complete::tag,
     number::{
@@ -9,21 +11,26 @@ use nom::{
 use nom_leb128::{leb128_i32, leb128_i64, leb128_u32};
 
 use crate::types::{
-    wasm_vec, BlockType, DataIdx, ElementIdx, Expr, FuncIdx, FuncTypeIdx, GlobalIdx, LabelIdx,
-    LocalIdx, MemoryArgument, RefType, TableIdx, ValueType,
+    wasm_vec, BlockType, DataIdx, ElementIdx, FuncIdx, FuncTypeIdx, GlobalIdx, LabelIdx, LocalIdx,
+    MemoryArgument, RefType, TableIdx, ValueType,
 };
+
+use super::expr::{Blocks, Instructions};
+
+#[derive(Debug, Clone, Copy)]
+pub struct BlockIdx(pub usize);
 
 #[derive(Debug)]
 pub enum Instruction {
     Unreachable,
     Nop,
-    Block(BlockType, Expr),
-    Loop(BlockType, Expr),
+    Block(BlockType, BlockIdx),
+    Loop(BlockType, BlockIdx),
 
     If {
         block_type: BlockType,
-        if_expr: Expr,
-        else_expr: Expr,
+        if_expr: BlockIdx,
+        else_expr: BlockIdx,
     },
     Break(LabelIdx),
     BreakIf(LabelIdx),
@@ -224,34 +231,38 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    pub fn parse(input: &[u8]) -> IResult<&[u8], Instruction> {
+    pub fn parse(input: &[u8], blocks: Rc<RefCell<Blocks>>) -> IResult<&[u8], Instruction> {
         let (input, value) = u8(input)?;
         let (input, instruction) = match value {
             0x00 => (input, Instruction::Unreachable),
             0x01 => (input, Instruction::Nop),
             0x02 | 0x03 => {
                 let (input, block_type) = BlockType::parse(input)?;
-                let (input, expr) = Expr::parse(input)?;
+                let (input, expr) = Instructions::parse(input, blocks.clone())?;
+
+                let idx = blocks.deref().borrow_mut().add(expr);
 
                 (
                     input,
                     if value == 0x02 {
-                        Instruction::Block(block_type, expr)
+                        Instruction::Block(block_type, idx)
                     } else {
-                        Instruction::Loop(block_type, expr)
+                        Instruction::Loop(block_type, idx)
                     },
                 )
             }
             0x04 => {
                 let (input, block_type) = BlockType::parse(input)?;
-                let (input, (if_expr, else_expr)) = Expr::parse_if(input)?;
+                let (input, (if_expr, else_expr)) = Instructions::parse_if(input, blocks.clone())?;
+                let if_idx = blocks.deref().borrow_mut().add(if_expr);
+                let else_idx = blocks.deref().borrow_mut().add(else_expr);
 
                 (
                     input,
                     Instruction::If {
                         block_type,
-                        if_expr,
-                        else_expr,
+                        if_expr: if_idx,
+                        else_expr: else_idx,
                     },
                 )
             }

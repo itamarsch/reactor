@@ -15,7 +15,7 @@ use crate::{
 
 use self::{function_state::FunctionState, stack::Stack};
 
-mod function_state;
+pub mod function_state;
 mod local;
 mod locals;
 mod stack;
@@ -289,8 +289,10 @@ impl<'a> Runtime<'a> {
                 )
             };
 
-            if self.current_function_state.borrow().instruction_index()
-                == current_function.code.instructions.0.len()
+            if current_function
+                .code
+                .instructions
+                .done(self.current_function_state.borrow().instruction_index())
             {
                 if self.function_depth.get() > 0 {
                     self.return_from_function(current_function);
@@ -300,8 +302,10 @@ impl<'a> Runtime<'a> {
                 }
             }
 
-            let instruction = &current_function.code.instructions.0
-                [self.current_function_state.borrow().instruction_index()];
+            let instruction = &current_function
+                .code
+                .instructions
+                .get_instruction(self.current_function_state.borrow().instruction_index());
             self.current_function_state.borrow_mut().next_instruction();
 
             self.run_instruction(instruction);

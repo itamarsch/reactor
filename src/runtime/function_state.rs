@@ -2,19 +2,22 @@ use crate::types::{FuncIdx, LocalIdx};
 
 use super::{locals::Locals, value::Value};
 
+#[derive(Debug, Clone, Copy)]
+pub struct InstructionIndex(pub usize);
+#[derive(Debug)]
+pub struct InstructionPosition(FuncIdx, InstructionIndex);
+
 #[derive(Debug)]
 pub struct FunctionState {
     locals: Locals,
-    instruction_index: usize,
-    function_idx: FuncIdx,
+    instruction_position: InstructionPosition,
 }
 
 impl FunctionState {
     pub fn new(locals: Locals, index: FuncIdx) -> Self {
         Self {
             locals,
-            function_idx: index,
-            instruction_index: 0,
+            instruction_position: InstructionPosition(index, InstructionIndex(0)),
         }
     }
 
@@ -27,14 +30,14 @@ impl FunctionState {
     }
 
     pub fn function_idx(&self) -> FuncIdx {
-        self.function_idx
+        self.instruction_position.0
     }
 
-    pub fn instruction_index(&self) -> usize {
-        self.instruction_index
+    pub fn instruction_index(&self) -> InstructionIndex {
+        self.instruction_position.1
     }
 
     pub fn next_instruction(&mut self) {
-        self.instruction_index += 1;
+        self.instruction_position.1 .0 += 1;
     }
 }

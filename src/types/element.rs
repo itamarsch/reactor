@@ -13,7 +13,7 @@ pub struct Element {
 fn func_idx_to_initializer(functions: Vec<FuncIdx>) -> Vec<Expr> {
     functions
         .into_iter()
-        .map(|func| Expr(vec![Instruction::PushFuncRef(func)]))
+        .map(|func| Expr::from_raw_instructions(vec![Instruction::PushFuncRef(func)]))
         .collect()
 }
 

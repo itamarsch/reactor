@@ -1,22 +1,59 @@
+use std::{cell::RefCell, rc::Rc};
+
 use nom::{bytes::complete::tag, IResult};
 
-use crate::types::code::instruction;
+use crate::runtime::function_state::InstructionIndex;
 
-use super::Instruction;
+use super::{instruction::BlockIdx, Instruction};
 
 #[derive(Debug)]
-pub struct Expr(pub Vec<Instruction>);
+pub struct Expr {
+    expr: Instructions,
+    blocks: Rc<RefCell<Blocks>>,
+}
+
 impl Expr {
+    pub fn parse(input: &[u8]) -> IResult<&[u8], Self> {
+        let blocks = Rc::new(RefCell::new(Blocks::empty()));
+        let (input, instructions) = Instructions::parse(input, blocks.clone())?;
+        Ok((
+            input,
+            Self {
+                expr: instructions,
+                blocks,
+            },
+        ))
+    }
+    pub fn from_raw_instructions(instructions: Vec<Instruction>) -> Self {
+        Self {
+            expr: Instructions(instructions),
+            blocks: Rc::new(RefCell::new(Blocks::empty())),
+        }
+    }
+
+    pub fn get_instruction(&self, state: InstructionIndex) -> &Instruction {
+        &self.expr.0[state.0]
+    }
+    pub fn done(&self, state: InstructionIndex) -> bool {
+        state.0 == self.expr.0.len()
+    }
+}
+
+#[derive(Debug)]
+pub struct Instructions(pub Vec<Instruction>);
+
+impl Instructions {
     pub fn empty() -> Self {
         Self(vec![])
     }
 
     fn parse_inner(
         mut input: &[u8],
+        blocks: Rc<RefCell<Blocks>>,
         reached_end: impl Fn(u8) -> (bool, u8),
-    ) -> IResult<&[u8], (Expr, u8)> {
+    ) -> IResult<&[u8], (Self, u8)> {
         if input.is_empty() {
-            return Ok((input, (Expr(vec![]), 0x0B)));
+            return Ok((input, (Self::empty(), 0x0B)));
         }
         let mut instructions = vec![];
         let ending_byte = loop {
@@ -26,33 +63,56 @@ impl Expr {
                 (input, _) = tag(&[0x0B][..])(input)?;
                 break end.1;
             }
-            (input, instruction) = Instruction::parse(input)?;
+            (input, instruction) = Instruction::parse(input, blocks.clone())?;
             instructions.push(instruction);
         };
-        Ok((input, (Expr(instructions), ending_byte)))
+        Ok((input, (Self(instructions), ending_byte)))
     }
 
-    pub fn parse(input: &[u8]) -> IResult<&[u8], Expr> {
-        let (input, (expr, 0x0B)) = Self::parse_inner(input, |v| (v == 0x0B, v))? else {
+    pub fn parse(input: &[u8], blocks: Rc<RefCell<Blocks>>) -> IResult<&[u8], Self> {
+        let (input, (expr, 0x0B)) = Self::parse_inner(input, blocks, |v| (v == 0x0B, v))? else {
             unreachable!()
         };
         Ok((input, expr))
     }
 
-    pub fn parse_if(input: &[u8]) -> IResult<&[u8], (Expr, Expr)> {
-        let (input, (if_expr, end)) = Self::parse_inner(input, |v| (v == 0x0B || v == 0x05, v))?;
+    pub fn parse_if<'a, 'b>(
+        input: &'a [u8],
+        blocks: Rc<RefCell<Blocks>>,
+    ) -> IResult<&'b [u8], (Self, Self)>
+    where
+        'a: 'b,
+    {
+        let (input, (if_expr, end)) =
+            Self::parse_inner(input, blocks.clone(), |v| (v == 0x0B || v == 0x05, v))?;
 
         let (input, else_expr) = if end == 0x05 {
-            let (input, (else_expr, 0x0B)) = Self::parse_inner(input, |v| (v == 0x0B, v))? else {
+            let (input, (else_expr, 0x0B)) =
+                Self::parse_inner(input, blocks.clone(), |v| (v == 0x0B, v))?
+            else {
                 unreachable!()
             };
             (input, else_expr)
         } else if end == 0x0B {
-            (input, Expr::empty())
+            (input, Self::empty())
         } else {
             unreachable!()
         };
 
         Ok((input, (if_expr, else_expr)))
+    }
+}
+
+#[derive(Debug)]
+pub struct Blocks(Vec<Instructions>);
+impl Blocks {
+    pub fn empty() -> Self {
+        Self(vec![])
+    }
+
+    pub fn add(&mut self, expr: Instructions) -> BlockIdx {
+        let new_idx = BlockIdx(self.0.len());
+        self.0.push(expr);
+        new_idx
     }
 }
