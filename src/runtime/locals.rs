@@ -35,19 +35,15 @@ impl Locals {
     ) -> Locals {
         let locals = local_types_to_defaults(non_function_parameter_types);
 
-        println!("Local: {:?}", function_parameters);
         let mut params = function_parameters
             .iter()
             .rev()
-            .map(|e| {
-                println!("{:?}", e);
-                match e {
-                    ValueType::Numeric(NumericValueType::I32) => Local::from_i32(stack.pop_i32()),
-                    ValueType::Numeric(NumericValueType::I64) => Local::from_i64(stack.pop_i64()),
-                    ValueType::Numeric(NumericValueType::F32) => Local::from_f32(stack.pop_f32()),
-                    ValueType::Numeric(NumericValueType::F64) => Local::from_f64(stack.pop_f64()),
-                    ValueType::Ref(_) => todo!(),
-                }
+            .map(|e| match e {
+                ValueType::Numeric(NumericValueType::I32) => Local::from_i32(stack.pop_i32()),
+                ValueType::Numeric(NumericValueType::I64) => Local::from_i64(stack.pop_i64()),
+                ValueType::Numeric(NumericValueType::F32) => Local::from_f32(stack.pop_f32()),
+                ValueType::Numeric(NumericValueType::F64) => Local::from_f64(stack.pop_f64()),
+                ValueType::Ref(_) => todo!(),
             })
             .collect::<Vec<_>>();
         params.reverse();

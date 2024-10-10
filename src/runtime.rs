@@ -1,11 +1,8 @@
 use std::{
-    borrow::Borrow,
     cell::{Cell, RefCell},
-    ops::{DerefMut, Shl},
+    ops::DerefMut,
     process::exit,
 };
-
-use nom::ParseTo;
 
 use crate::{
     module::{
@@ -100,12 +97,12 @@ impl<'a> Runtime<'a> {
     }
 
     fn run_instruction(&self, instruction: &Instruction) {
-        println!(
-            "Executing: {:?}, current state: {:?}, stack: {:?}",
-            instruction,
-            self.current_function_state.borrow(),
-            self.stack.borrow()
-        );
+        // println!(
+        //     "Executing: {:?}, current state: {:?}, stack: {:?}",
+        //     instruction,
+        //     self.current_function_state.borrow(),
+        //     self.stack.borrow()
+        // );
         match instruction {
             Instruction::Call(func_idx) => {
                 self.call_function(*func_idx);
@@ -252,7 +249,6 @@ impl<'a> Runtime<'a> {
         let mut returns = Vec::with_capacity(amount_of_returns);
         for _ in 0..amount_of_returns {
             let value = self.stack.borrow_mut().pop_value();
-            println!("{}, {:?}", amount_of_returns, value);
             returns.push(value);
         }
 
@@ -294,7 +290,7 @@ impl<'a> Runtime<'a> {
             };
 
             if self.current_function_state.borrow().instruction_index()
-                == current_function.code.instructions.len()
+                == current_function.code.instructions.0.len()
             {
                 if self.function_depth.get() > 0 {
                     self.return_from_function(current_function);
@@ -304,7 +300,7 @@ impl<'a> Runtime<'a> {
                 }
             }
 
-            let instruction = &current_function.code.instructions
+            let instruction = &current_function.code.instructions.0
                 [self.current_function_state.borrow().instruction_index()];
             self.current_function_state.borrow_mut().next_instruction();
 

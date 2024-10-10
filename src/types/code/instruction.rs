@@ -22,8 +22,8 @@ pub enum Instruction {
 
     If {
         block_type: BlockType,
-        if_instructions: Vec<Instruction>,
-        else_instructions: Vec<Instruction>,
+        if_expr: Expr,
+        else_expr: Expr,
     },
     Break(LabelIdx),
     BreakIf(LabelIdx),
@@ -243,35 +243,15 @@ impl Instruction {
                 )
             }
             0x04 => {
-                let (mut input, block_type) = BlockType::parse(input)?;
-                let mut if_instructions = vec![];
-                let mut else_instructions = vec![];
-                let mut reached_else = false;
-                loop {
-                    let instruction;
-                    if input[0] == 0x05 {
-                        reached_else = true;
-                        (input, _) = tag(&[0x05][..])(input)?;
-                        continue;
-                    }
-                    if input[0] == 0x0B {
-                        (input, _) = tag(&[0x0B][..])(input)?;
-                        break;
-                    }
-                    (input, instruction) = Instruction::parse(input)?;
-                    if reached_else {
-                        else_instructions.push(instruction);
-                    } else {
-                        if_instructions.push(instruction);
-                    }
-                }
+                let (input, block_type) = BlockType::parse(input)?;
+                let (input, (if_expr, else_expr)) = Expr::parse_if(input)?;
 
                 (
                     input,
                     Instruction::If {
                         block_type,
-                        if_instructions,
-                        else_instructions,
+                        if_expr,
+                        else_expr,
                     },
                 )
             }

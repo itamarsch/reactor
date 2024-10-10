@@ -14,7 +14,7 @@ fn main() {
     let (_, sections) = parse_module(&file[..]).unwrap();
 
     let module = Module::new(sections);
-    println!("{:#?}", module);
+    // println!("{:#?}", module);
     let runtime = Runtime::new(module);
     runtime.execute();
 }
@@ -25,7 +25,6 @@ fn parse_module(input: &[u8]) -> IResult<&[u8], HashMap<SectionType, Section>> {
     let (input, _) = tag(VERSION.to_le_bytes())(input)?;
 
     let (input, sections) = many0(Section::parse.map(|s| (s.get_variant(), s)))(input)?;
-    sections.iter().for_each(|e| println!("{:?}", e));
 
     let mut sections_hashmap = HashMap::with_capacity(sections.len());
 
