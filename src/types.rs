@@ -35,7 +35,7 @@ pub use value::{NumericValueType, ValueType};
 
 pub use import::{Import, ImportDesc};
 
-pub use code::{FunctionCode, Instruction, LocalIdx, LocalTypes, MemoryArgument};
+pub use code::{BlockIdx, FunctionCode, Instruction, LocalIdx, LocalTypes, MemoryArgument};
 
 pub use export::{Export, ExportDesc};
 

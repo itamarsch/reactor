@@ -6,6 +6,7 @@ mod memory_argument;
 
 pub use expr::Expr;
 pub use function::FunctionCode;
+pub use instruction::BlockIdx;
 pub use instruction::Instruction;
 pub use local::LocalIdx;
 pub use local::LocalTypes;

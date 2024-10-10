@@ -1,4 +1,8 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Ref, RefCell},
+    ops::Deref,
+    rc::Rc,
+};
 
 use nom::{bytes::complete::tag, IResult};
 
@@ -8,7 +12,7 @@ use super::{instruction::BlockIdx, Instruction};
 
 #[derive(Debug)]
 pub struct Expr {
-    expr: Instructions,
+    expr: RefCell<Instructions>,
     blocks: Rc<RefCell<Blocks>>,
 }
 
@@ -19,23 +23,37 @@ impl Expr {
         Ok((
             input,
             Self {
-                expr: instructions,
+                expr: RefCell::new(instructions),
                 blocks,
             },
         ))
     }
     pub fn from_raw_instructions(instructions: Vec<Instruction>) -> Self {
         Self {
-            expr: Instructions(instructions),
+            expr: RefCell::new(Instructions(instructions)),
             blocks: Rc::new(RefCell::new(Blocks::empty())),
         }
     }
 
-    pub fn get_instruction(&self, state: InstructionIndex) -> &Instruction {
-        &self.expr.0[state.0]
+    pub fn get_instruction(&self, state: InstructionIndex) -> Ref<Instruction> {
+        match state {
+            InstructionIndex::IndexInFunction(i) => {
+                let expr = self.expr.borrow();
+                Ref::map(expr, |expr| &expr.0[i])
+            }
+            InstructionIndex::IndexInBlock(block_idx, _, i) => {
+                let block = self.blocks.deref().borrow();
+                Ref::map(block, |blocks| &blocks.get(block_idx).0[i])
+            }
+        }
     }
     pub fn done(&self, state: InstructionIndex) -> bool {
-        state.0 == self.expr.0.len()
+        match state {
+            InstructionIndex::IndexInFunction(i) => self.expr.borrow().0.len() == i,
+            InstructionIndex::IndexInBlock(block_idx, _, i) => {
+                self.blocks.deref().borrow().get(block_idx).0.len() == i
+            }
+        }
     }
 }
 
@@ -114,5 +132,9 @@ impl Blocks {
         let new_idx = BlockIdx(self.0.len());
         self.0.push(expr);
         new_idx
+    }
+
+    pub fn get(&self, BlockIdx(block_idx): BlockIdx) -> &Instructions {
+        &self.0[block_idx]
     }
 }

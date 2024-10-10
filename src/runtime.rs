@@ -5,12 +5,9 @@ use std::{
 };
 
 use crate::{
-    module::{
-        functions::{Function, LocalFunction},
-        Module,
-    },
+    module::{functions::Function, Module},
     runtime::{locals::Locals, value::Value},
-    types::{FuncIdx, Instruction, NumericValueType, ValueType},
+    types::{BlockIdx, BlockType, FuncIdx, Instruction, NumericValueType, ValueType},
 };
 
 use self::{function_state::FunctionState, stack::Stack};
@@ -39,7 +36,7 @@ impl<'a> Runtime<'a> {
         );
 
         let stack = RefCell::new(Stack::new());
-        let initial_function_state = RefCell::new(FunctionState::new(
+        let initial_function_state = RefCell::new(FunctionState::new_function(
             Locals::new_no_function_parameters(&starting_function.code.locals),
             start_idx,
         ));
@@ -78,7 +75,7 @@ impl<'a> Runtime<'a> {
                     self.stack.borrow_mut().deref_mut(),
                 );
 
-                let mut new_function_state = FunctionState::new(locals, func_idx);
+                let mut new_function_state = FunctionState::new_function(locals, func_idx);
 
                 std::mem::swap(
                     &mut new_function_state,
@@ -97,13 +94,10 @@ impl<'a> Runtime<'a> {
     }
 
     fn run_instruction(&self, instruction: &Instruction) {
-        // println!(
-        //     "Executing: {:?}, current state: {:?}, stack: {:?}",
-        //     instruction,
-        //     self.current_function_state.borrow(),
-        //     self.stack.borrow()
-        // );
         match instruction {
+            Instruction::Block(block_type, block_idx) => {
+                self.execute_block(*block_idx, *block_type)
+            }
             Instruction::Call(func_idx) => {
                 self.call_function(*func_idx);
             }
@@ -139,16 +133,28 @@ impl<'a> Runtime<'a> {
 
                 self.stack.borrow_mut().push_i32(a.wrapping_add(b));
             }
-            Instruction::I32RemS => {
+            Instruction::I32Sub => {
                 let b = self.stack.borrow_mut().pop_i32();
                 let a = self.stack.borrow_mut().pop_i32();
-                self.stack.borrow_mut().push_i32(a % b);
+
+                self.stack.borrow_mut().push_i32(a.wrapping_sub(b));
             }
             Instruction::I32Mul => {
                 let b = self.stack.borrow_mut().pop_i32();
                 let a = self.stack.borrow_mut().pop_i32();
 
                 self.stack.borrow_mut().push_i32(a.wrapping_mul(b));
+            }
+            Instruction::I32DivS => {
+                let b = self.stack.borrow_mut().pop_i32();
+                let a = self.stack.borrow_mut().pop_i32();
+
+                self.stack.borrow_mut().push_i32(a / b);
+            }
+            Instruction::I32RemS => {
+                let b = self.stack.borrow_mut().pop_i32();
+                let a = self.stack.borrow_mut().pop_i32();
+                self.stack.borrow_mut().push_i32(a % b);
             }
             Instruction::I64Add => {
                 let b = self.stack.borrow_mut().pop_i64();
@@ -161,11 +167,23 @@ impl<'a> Runtime<'a> {
 
                 self.stack.borrow_mut().push_i64(a.wrapping_sub(b));
             }
+
             Instruction::I64Mul => {
                 let b = self.stack.borrow_mut().pop_i64();
                 let a = self.stack.borrow_mut().pop_i64();
 
                 self.stack.borrow_mut().push_i64(a.wrapping_mul(b));
+            }
+            Instruction::I64DivS => {
+                let b = self.stack.borrow_mut().pop_i64();
+                let a = self.stack.borrow_mut().pop_i64();
+
+                self.stack.borrow_mut().push_i64(a / b);
+            }
+            Instruction::I64RemS => {
+                let b = self.stack.borrow_mut().pop_i64();
+                let a = self.stack.borrow_mut().pop_i64();
+                self.stack.borrow_mut().push_i64(a % b);
             }
             Instruction::I64ShrS => {
                 let b = self.stack.borrow_mut().pop_i64();
@@ -176,6 +194,12 @@ impl<'a> Runtime<'a> {
                 let b = self.stack.borrow_mut().pop_i64();
                 let a = self.stack.borrow_mut().pop_i64();
                 self.stack.borrow_mut().push_i64(a << (b % 64));
+            }
+            Instruction::F32Add => {
+                let b = self.stack.borrow_mut().pop_f32();
+                let a = self.stack.borrow_mut().pop_f32();
+
+                self.stack.borrow_mut().push_f32(a + b);
             }
 
             Instruction::F32Sub => {
@@ -189,6 +213,12 @@ impl<'a> Runtime<'a> {
                 let a = self.stack.borrow_mut().pop_f32();
 
                 self.stack.borrow_mut().push_f32(a * b);
+            }
+            Instruction::F32Div => {
+                let b = self.stack.borrow_mut().pop_f32();
+                let a = self.stack.borrow_mut().pop_f32();
+
+                self.stack.borrow_mut().push_f32(a / b);
             }
             Instruction::F32Sqrt => {
                 let a = self.stack.borrow_mut().pop_f32();
@@ -205,6 +235,12 @@ impl<'a> Runtime<'a> {
                 let a = self.stack.borrow_mut().pop_f64();
 
                 self.stack.borrow_mut().push_f64(a - b);
+            }
+            Instruction::F64Mul => {
+                let b = self.stack.borrow_mut().pop_f64();
+                let a = self.stack.borrow_mut().pop_f64();
+
+                self.stack.borrow_mut().push_f64(a * b);
             }
             Instruction::F64Div => {
                 let b = self.stack.borrow_mut().pop_f64();
@@ -242,22 +278,37 @@ impl<'a> Runtime<'a> {
                 instruction, self.stack
             ),
         }
+        println!(
+            "Executed: {:?}, current state: {:?}, stack: {:?}",
+            instruction,
+            "",
+            "" // self.current_function_state.borrow(),
+               // self.stack.borrow()
+        );
     }
 
-    fn return_from_function(&self, current_function: &LocalFunction) {
-        let amount_of_returns = current_function.signature.returns.len();
+    fn execute_block(&self, block_idx: BlockIdx, block_type: BlockType) {
+        let mut new_function_state = self
+            .current_function_state
+            .borrow()
+            .new_block(block_idx, block_type);
+        std::mem::swap(
+            &mut new_function_state,
+            self.current_function_state.borrow_mut().deref_mut(),
+        );
+        self.stack
+            .borrow_mut()
+            .push_function_state(new_function_state);
+    }
+    fn pop_returns(&self, signature_returns: &[ValueType]) -> Vec<Value> {
+        let amount_of_returns = signature_returns.len();
         let mut returns = Vec::with_capacity(amount_of_returns);
         for _ in 0..amount_of_returns {
             let value = self.stack.borrow_mut().pop_value();
             returns.push(value);
         }
 
-        for (signature, value) in current_function
-            .signature
-            .returns
-            .iter()
-            .zip(returns.iter().rev())
-        {
+        for (signature, value) in signature_returns.iter().zip(returns.iter().rev()) {
             match (signature, value) {
                 (ValueType::Numeric(NumericValueType::I32), Value::I32(_))
                 | (ValueType::Numeric(NumericValueType::I64), Value::I64(_))
@@ -268,14 +319,22 @@ impl<'a> Runtime<'a> {
                 }
             }
         }
-        let function_state = self.stack.borrow_mut().pop_function_state();
-        for _ in 0..amount_of_returns {
+        returns
+    }
+
+    fn reassemble_returns(&self, returns: &mut Vec<Value>) {
+        for _ in 0..returns.len() {
             self.stack
                 .borrow_mut()
                 .push_value(returns.pop().expect("Pushed enough elements"));
         }
+    }
+
+    fn return_from_function(&self, signature_returns: &[ValueType]) {
+        let mut returns = self.pop_returns(signature_returns);
+        let function_state = self.stack.borrow_mut().pop_function_state();
+        self.reassemble_returns(&mut returns);
         *self.current_function_state.borrow_mut() = function_state;
-        self.function_depth.set(self.function_depth.get() - 1);
     }
 
     pub fn execute(self) {
@@ -294,8 +353,25 @@ impl<'a> Runtime<'a> {
                 .instructions
                 .done(self.current_function_state.borrow().instruction_index())
             {
-                if self.function_depth.get() > 0 {
-                    self.return_from_function(current_function);
+                if self.function_depth.get() > 0 || self.current_function_state.borrow().in_block()
+                {
+                    let borrow = self.current_function_state.borrow();
+                    let index = borrow.instruction_index();
+                    drop(borrow);
+
+                    match index {
+                        function_state::InstructionIndex::IndexInFunction(_) => {
+                            self.return_from_function(&current_function.signature.returns);
+                            self.function_depth.set(self.function_depth.get() - 1);
+                        }
+                        function_state::InstructionIndex::IndexInBlock(_, block_type, _) => {
+                            let block_type_slice = match block_type.0 {
+                                Some(t) => &[t][..],
+                                None => &[][..],
+                            };
+                            self.return_from_function(block_type_slice)
+                        }
+                    }
                     continue;
                 } else {
                     break;
@@ -306,6 +382,7 @@ impl<'a> Runtime<'a> {
                 .code
                 .instructions
                 .get_instruction(self.current_function_state.borrow().instruction_index());
+
             self.current_function_state.borrow_mut().next_instruction();
 
             self.run_instruction(instruction);

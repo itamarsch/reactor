@@ -1,32 +1,48 @@
-use crate::types::{FuncIdx, LocalIdx};
+use std::{cell::RefCell, ops::Deref, rc::Rc};
+
+use crate::types::{BlockIdx, BlockType, FuncIdx, LocalIdx};
 
 use super::{locals::Locals, value::Value};
 
 #[derive(Debug, Clone, Copy)]
-pub struct InstructionIndex(pub usize);
+pub enum InstructionIndex {
+    IndexInFunction(usize),
+    IndexInBlock(BlockIdx, BlockType, usize),
+}
+
 #[derive(Debug)]
 pub struct InstructionPosition(FuncIdx, InstructionIndex);
 
 #[derive(Debug)]
 pub struct FunctionState {
-    locals: Locals,
+    locals: Rc<RefCell<Locals>>,
     instruction_position: InstructionPosition,
 }
 
 impl FunctionState {
-    pub fn new(locals: Locals, index: FuncIdx) -> Self {
+    pub fn new_function(locals: Locals, index: FuncIdx) -> Self {
         Self {
-            locals,
-            instruction_position: InstructionPosition(index, InstructionIndex(0)),
+            locals: Rc::new(RefCell::new(locals)),
+            instruction_position: InstructionPosition(index, InstructionIndex::IndexInFunction(0)),
+        }
+    }
+
+    pub fn new_block(&self, block_idx: BlockIdx, block_type: BlockType) -> Self {
+        Self {
+            locals: self.locals.clone(),
+            instruction_position: InstructionPosition(
+                self.instruction_position.0,
+                InstructionIndex::IndexInBlock(block_idx, block_type, 0),
+            ),
         }
     }
 
     pub fn get_local_value(&self, idx: LocalIdx) -> Value {
-        self.locals.get_value(idx)
+        self.locals.deref().borrow().get_value(idx)
     }
 
     pub fn set_local_value(&mut self, idx: LocalIdx, value: Value) {
-        self.locals.set_value(idx, value);
+        self.locals.deref().borrow_mut().set_value(idx, value);
     }
 
     pub fn function_idx(&self) -> FuncIdx {
@@ -37,7 +53,21 @@ impl FunctionState {
         self.instruction_position.1
     }
 
+    pub fn in_block(&self) -> bool {
+        matches!(
+            self.instruction_position.1,
+            InstructionIndex::IndexInBlock(_, _, _)
+        )
+    }
+
     pub fn next_instruction(&mut self) {
-        self.instruction_position.1 .0 += 1;
+        match &mut self.instruction_position.1 {
+            InstructionIndex::IndexInFunction(ref mut i) => {
+                *i += 1;
+            }
+            InstructionIndex::IndexInBlock(_, _, ref mut i) => {
+                *i += 1;
+            }
+        }
     }
 }

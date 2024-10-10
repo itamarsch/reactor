@@ -2,7 +2,7 @@ use nom::{number::complete::u8, IResult};
 
 use super::ValueType;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct BlockType(pub Option<ValueType>);
 
 impl BlockType {
