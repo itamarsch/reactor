@@ -7,7 +7,7 @@ use std::{
 use crate::{
     module::{functions::Function, Module},
     runtime::{locals::Locals, value::Value},
-    types::{BlockIdx, BlockType, FuncIdx, Instruction, NumericValueType, ValueType},
+    types::{BlockIdx, FuncIdx, Instruction, NumericValueType, ValueType},
 };
 
 use self::{function_state::FunctionState, stack::Stack};
@@ -95,19 +95,13 @@ impl<'a> Runtime<'a> {
 
     fn run_instruction(&self, instruction: &Instruction) {
         match instruction {
-            Instruction::Block(block_type, block_idx) => {
-                self.execute_block(*block_idx, *block_type)
-            }
-            Instruction::If {
-                block_type,
-                if_expr,
-                else_expr,
-            } => {
+            Instruction::Block(block_idx) => self.execute_block(*block_idx),
+            Instruction::If { if_expr, else_expr } => {
                 let condition = self.stack.borrow_mut().pop_bool();
                 if condition {
-                    self.execute_block(*if_expr, *block_type);
+                    self.execute_block(*if_expr);
                 } else {
-                    self.execute_block(*else_expr, *block_type);
+                    self.execute_block(*else_expr);
                 }
             }
             Instruction::Call(func_idx) => {
@@ -299,11 +293,8 @@ impl<'a> Runtime<'a> {
         );
     }
 
-    fn execute_block(&self, block_idx: BlockIdx, block_type: BlockType) {
-        let mut new_function_state = self
-            .current_function_state
-            .borrow()
-            .new_block(block_idx, block_type);
+    fn execute_block(&self, block_idx: BlockIdx) {
+        let mut new_function_state = self.current_function_state.borrow().new_block(block_idx);
         std::mem::swap(
             &mut new_function_state,
             self.current_function_state.borrow_mut().deref_mut(),
@@ -376,7 +367,8 @@ impl<'a> Runtime<'a> {
                             self.return_from_function(&current_function.signature.returns);
                             self.function_depth.set(self.function_depth.get() - 1);
                         }
-                        function_state::InstructionIndex::IndexInBlock(_, block_type, _) => {
+                        function_state::InstructionIndex::IndexInBlock(idx, _) => {
+                            let block_type = current_function.code.instructions.get_block_type(idx);
                             let block_type_slice = match block_type.0 {
                                 Some(t) => &[t][..],
                                 None => &[][..],

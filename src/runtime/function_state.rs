@@ -1,13 +1,13 @@
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
-use crate::types::{BlockIdx, BlockType, FuncIdx, LocalIdx};
+use crate::types::{BlockIdx, FuncIdx, LocalIdx};
 
 use super::{locals::Locals, value::Value};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InstructionIndex {
     IndexInFunction(usize),
-    IndexInBlock(BlockIdx, BlockType, usize),
+    IndexInBlock(BlockIdx, usize),
 }
 
 #[derive(Debug)]
@@ -27,12 +27,12 @@ impl FunctionState {
         }
     }
 
-    pub fn new_block(&self, block_idx: BlockIdx, block_type: BlockType) -> Self {
+    pub fn new_block(&self, block_idx: BlockIdx) -> Self {
         Self {
             locals: self.locals.clone(),
             instruction_position: InstructionPosition(
                 self.instruction_position.0,
-                InstructionIndex::IndexInBlock(block_idx, block_type, 0),
+                InstructionIndex::IndexInBlock(block_idx, 0),
             ),
         }
     }
@@ -56,7 +56,7 @@ impl FunctionState {
     pub fn in_block(&self) -> bool {
         matches!(
             self.instruction_position.1,
-            InstructionIndex::IndexInBlock(_, _, _)
+            InstructionIndex::IndexInBlock(_, _)
         )
     }
 
@@ -65,7 +65,7 @@ impl FunctionState {
             InstructionIndex::IndexInFunction(ref mut i) => {
                 *i += 1;
             }
-            InstructionIndex::IndexInBlock(_, _, ref mut i) => {
+            InstructionIndex::IndexInBlock(_, ref mut i) => {
                 *i += 1;
             }
         }

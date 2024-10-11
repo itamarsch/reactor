@@ -4,9 +4,9 @@ use std::{
     rc::Rc,
 };
 
-use nom::{bytes::complete::tag, number::complete::u8, IResult};
+use nom::{number::complete::u8, IResult};
 
-use crate::runtime::function_state::InstructionIndex;
+use crate::{runtime::function_state::InstructionIndex, types::BlockType};
 
 use super::{instruction::BlockIdx, Instruction};
 
@@ -28,6 +28,12 @@ impl Expr {
             },
         ))
     }
+
+    pub fn get_block_type(&self, block_idx: BlockIdx) -> Ref<BlockType> {
+        let block_ref = self.blocks.deref().borrow();
+        Ref::map(block_ref, |blocks| &blocks.get(block_idx).1)
+    }
+
     pub fn from_raw_instructions(instructions: Vec<Instruction>) -> Self {
         Self {
             expr: RefCell::new(Instructions(instructions)),
@@ -39,19 +45,28 @@ impl Expr {
         match state {
             InstructionIndex::IndexInFunction(i) => {
                 let expr = self.expr.borrow();
-                Ref::map(expr, |expr| &expr.0[i])
+                Ref::map(expr, |expr| &expr[i])
             }
-            InstructionIndex::IndexInBlock(block_idx, _, i) => {
-                let block = self.blocks.deref().borrow();
-                Ref::map(block, |blocks| &blocks.get(block_idx).0[i])
+            InstructionIndex::IndexInBlock(block_idx, i) => {
+                let blocks = self.blocks.deref().borrow();
+                Ref::map(blocks, |blocks| {
+                    let current_block = &blocks.get(block_idx);
+                    &current_block.instructions()[i]
+                })
             }
         }
     }
     pub fn done(&self, state: InstructionIndex) -> bool {
         match state {
             InstructionIndex::IndexInFunction(i) => self.expr.borrow().0.len() == i,
-            InstructionIndex::IndexInBlock(block_idx, _, i) => {
-                self.blocks.deref().borrow().get(block_idx).0.len() == i
+            InstructionIndex::IndexInBlock(block_idx, i) => {
+                self.blocks
+                    .deref()
+                    .borrow()
+                    .get(block_idx)
+                    .instructions()
+                    .len()
+                    == i
             }
         }
     }
@@ -59,6 +74,14 @@ impl Expr {
 
 #[derive(Debug)]
 pub struct Instructions(pub Vec<Instruction>);
+
+impl Deref for Instructions {
+    type Target = Vec<Instruction>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl Instructions {
     pub fn empty() -> Self {
@@ -122,19 +145,31 @@ impl Instructions {
 }
 
 #[derive(Debug)]
-pub struct Blocks(Vec<Instructions>);
+pub struct Block(Instructions, BlockType);
+impl Block {
+    pub fn instructions(&self) -> &Instructions {
+        &self.0
+    }
+
+    pub fn block_type(&self) -> BlockType {
+        self.1
+    }
+}
+
+#[derive(Debug)]
+pub struct Blocks(Vec<Block>);
 impl Blocks {
     pub fn empty() -> Self {
         Self(vec![])
     }
 
-    pub fn add(&mut self, expr: Instructions) -> BlockIdx {
+    pub fn add(&mut self, expr: Instructions, block_type: BlockType) -> BlockIdx {
         let new_idx = BlockIdx(self.0.len());
-        self.0.push(expr);
+        self.0.push(Block(expr, block_type));
         new_idx
     }
 
-    pub fn get(&self, BlockIdx(block_idx): BlockIdx) -> &Instructions {
+    pub fn get(&self, BlockIdx(block_idx): BlockIdx) -> &Block {
         &self.0[block_idx]
     }
 }

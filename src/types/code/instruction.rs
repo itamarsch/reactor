@@ -24,11 +24,10 @@ pub struct BlockIdx(pub usize);
 pub enum Instruction {
     Unreachable,
     Nop,
-    Block(BlockType, BlockIdx),
-    Loop(BlockType, BlockIdx),
+    Block(BlockIdx),
+    Loop(BlockIdx),
 
     If {
-        block_type: BlockType,
         if_expr: BlockIdx,
         else_expr: BlockIdx,
     },
@@ -240,27 +239,26 @@ impl Instruction {
                 let (input, block_type) = BlockType::parse(input)?;
                 let (input, expr) = Instructions::parse(input, blocks.clone())?;
 
-                let idx = blocks.deref().borrow_mut().add(expr);
+                let idx = blocks.deref().borrow_mut().add(expr, block_type);
 
                 (
                     input,
                     if value == 0x02 {
-                        Instruction::Block(block_type, idx)
+                        Instruction::Block(idx)
                     } else {
-                        Instruction::Loop(block_type, idx)
+                        Instruction::Loop(idx)
                     },
                 )
             }
             0x04 => {
                 let (input, block_type) = BlockType::parse(input)?;
                 let (input, (if_expr, else_expr)) = Instructions::parse_if(input, blocks.clone())?;
-                let if_idx = blocks.deref().borrow_mut().add(if_expr);
-                let else_idx = blocks.deref().borrow_mut().add(else_expr);
+                let if_idx = blocks.deref().borrow_mut().add(if_expr, block_type);
+                let else_idx = blocks.deref().borrow_mut().add(else_expr, block_type);
 
                 (
                     input,
                     Instruction::If {
-                        block_type,
                         if_expr: if_idx,
                         else_expr: else_idx,
                     },
