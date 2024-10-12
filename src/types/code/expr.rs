@@ -1,5 +1,5 @@
 use std::{
-    cell::{Ref, RefCell},
+    cell::{OnceCell, Ref, RefCell},
     ops::Deref,
     rc::Rc,
 };
@@ -157,19 +157,28 @@ impl Block {
 }
 
 #[derive(Debug)]
-pub struct Blocks(Vec<Block>);
+pub struct Blocks(Vec<OnceCell<Block>>);
 impl Blocks {
     pub fn empty() -> Self {
         Self(vec![])
     }
 
-    pub fn add(&mut self, expr: Instructions, block_type: BlockType) -> BlockIdx {
+    pub fn new_block(&mut self) -> BlockIdx {
         let new_idx = BlockIdx(self.0.len());
-        self.0.push(Block(expr, block_type));
+        self.0.push(OnceCell::new());
         new_idx
     }
 
+    pub fn set_new_block(
+        &mut self,
+        expr: Instructions,
+        block_type: BlockType,
+        BlockIdx(block_idx): BlockIdx,
+    ) {
+        self.0[block_idx].set(Block(expr, block_type)).unwrap();
+    }
+
     pub fn get(&self, BlockIdx(block_idx): BlockIdx) -> &Block {
-        &self.0[block_idx]
+        self.0[block_idx].get().unwrap()
     }
 }

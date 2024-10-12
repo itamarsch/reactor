@@ -237,9 +237,13 @@ impl Instruction {
             0x01 => (input, Instruction::Nop),
             0x02 | 0x03 => {
                 let (input, block_type) = BlockType::parse(input)?;
+                let idx = blocks.deref().borrow_mut().new_block();
                 let (input, expr) = Instructions::parse(input, blocks.clone())?;
 
-                let idx = blocks.deref().borrow_mut().add(expr, block_type);
+                blocks
+                    .deref()
+                    .borrow_mut()
+                    .set_new_block(expr, block_type, idx);
 
                 (
                     input,
@@ -252,9 +256,17 @@ impl Instruction {
             }
             0x04 => {
                 let (input, block_type) = BlockType::parse(input)?;
+                let if_idx = blocks.deref().borrow_mut().new_block();
+                let else_idx = blocks.deref().borrow_mut().new_block();
                 let (input, (if_expr, else_expr)) = Instructions::parse_if(input, blocks.clone())?;
-                let if_idx = blocks.deref().borrow_mut().add(if_expr, block_type);
-                let else_idx = blocks.deref().borrow_mut().add(else_expr, block_type);
+                blocks
+                    .deref()
+                    .borrow_mut()
+                    .set_new_block(if_expr, block_type, if_idx);
+                blocks
+                    .deref()
+                    .borrow_mut()
+                    .set_new_block(else_expr, block_type, else_idx);
 
                 (
                     input,
