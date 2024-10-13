@@ -1,4 +1,5 @@
 use std::{
+    borrow::Borrow,
     cell::{OnceCell, Ref, RefCell},
     ops::Deref,
     rc::Rc,
@@ -19,7 +20,10 @@ pub struct Expr {
 impl Expr {
     pub fn parse(input: &[u8]) -> IResult<&[u8], Self> {
         let blocks = Rc::new(RefCell::new(Blocks::empty()));
-        let (input, instructions) = Instructions::parse(input, blocks.clone())?;
+        let block_stack = Rc::new(RefCell::new(vec![]));
+        let (input, instructions) =
+            Instructions::parse(input, blocks.clone(), block_stack.clone())?;
+        assert!(block_stack.deref().borrow().is_empty());
         Ok((
             input,
             Self {
@@ -91,6 +95,7 @@ impl Instructions {
     fn parse_inner(
         mut input: &[u8],
         blocks: Rc<RefCell<Blocks>>,
+        block_stack: Rc<RefCell<Vec<BlockIdx>>>,
         reached_end: impl Fn(u8) -> (bool, u8),
     ) -> IResult<&[u8], (Self, u8)> {
         if input.is_empty() {
@@ -104,43 +109,51 @@ impl Instructions {
                 (input, _) = u8(input)?;
                 break end.1;
             }
-            (input, instruction) = Instruction::parse(input, blocks.clone())?;
+            (input, instruction) = Instruction::parse(input, blocks.clone(), block_stack.clone())?;
             instructions.push(instruction);
         };
         Ok((input, (Self(instructions), ending_byte)))
     }
 
-    pub fn parse(input: &[u8], blocks: Rc<RefCell<Blocks>>) -> IResult<&[u8], Self> {
-        let (input, (expr, 0x0B)) = Self::parse_inner(input, blocks, |v| (v == 0x0B, v))? else {
+    pub fn parse(
+        input: &[u8],
+        blocks: Rc<RefCell<Blocks>>,
+        block_stack: Rc<RefCell<Vec<BlockIdx>>>,
+    ) -> IResult<&[u8], Self> {
+        let (input, (expr, 0x0B)) =
+            Self::parse_inner(input, blocks, block_stack, |v| (v == 0x0B, v))?
+        else {
             unreachable!()
         };
         Ok((input, expr))
     }
 
-    pub fn parse_if<'a, 'b>(
+    pub fn parse_if_block<'a, 'b>(
         input: &'a [u8],
         blocks: Rc<RefCell<Blocks>>,
-    ) -> IResult<&'b [u8], (Self, Self)>
+        block_stack: Rc<RefCell<Vec<BlockIdx>>>,
+    ) -> IResult<&'b [u8], (Self, bool)>
     where
         'a: 'b,
     {
         let (input, (if_expr, end)) =
-            Self::parse_inner(input, blocks.clone(), |v| (v == 0x0B || v == 0x05, v))?;
+            Self::parse_inner(input, blocks.clone(), block_stack.clone(), |v| {
+                (v == 0x0B || v == 0x05, v)
+            })?;
 
-        let (input, else_expr) = if end == 0x05 {
-            let (input, (else_expr, 0x0B)) =
-                Self::parse_inner(input, blocks.clone(), |v| (v == 0x0B, v))?
-            else {
-                unreachable!()
-            };
-            (input, else_expr)
-        } else if end == 0x0B {
-            (input, Self::empty())
-        } else {
-            unreachable!()
-        };
-
-        Ok((input, (if_expr, else_expr)))
+        Ok((
+            input,
+            (
+                if_expr,
+                if end == 0x05 {
+                    true
+                } else if end == 0x0B {
+                    false
+                } else {
+                    unreachable!()
+                },
+            ),
+        ))
     }
 }
 
