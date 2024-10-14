@@ -111,13 +111,13 @@ impl<'a> Runtime<'a> {
             .instructions
             .get_block_type(break_from_idx);
         let block_type_slice = block_type_to_slice!(block_type);
-        let mut block_returns = self.pop_returns(block_type_slice);
         self.stack
             .borrow_mut()
             .push_function_state(self.current_function_state.borrow().clone());
-        let new_function_state = self.stack.borrow_mut().break_from_block(break_from_idx);
-        self.reassemble_returns(&mut block_returns);
-        *self.current_function_state.borrow_mut() = new_function_state;
+
+        self.return_from_context(block_type_slice, || {
+            self.stack.borrow_mut().break_from_block(break_from_idx)
+        });
     }
 
     fn run_instruction(&self, instruction: &Instruction, current_function: &LocalFunction) {
@@ -145,6 +145,9 @@ impl<'a> Runtime<'a> {
                 let index = self.stack.borrow_mut().pop_i32() as usize;
                 let block_index = *labels.get(index).unwrap_or(default);
                 self.break_from_block(block_index, current_function);
+            }
+            Instruction::Return => {
+                self.return_immediate(&current_function.signature.returns[..]);
             }
 
             Instruction::Call(func_idx) => {
@@ -371,11 +374,27 @@ impl<'a> Runtime<'a> {
         }
     }
 
-    fn return_from_function(&self, signature_returns: &[ValueType]) {
+    fn return_from_context(
+        &self,
+        signature_returns: &[ValueType],
+        mut get_next_function_state: impl FnMut() -> FunctionState,
+    ) {
         let mut returns = self.pop_returns(signature_returns);
-        let function_state = self.stack.borrow_mut().pop_function_state();
+        let function_state = get_next_function_state();
         self.reassemble_returns(&mut returns);
         *self.current_function_state.borrow_mut() = function_state;
+    }
+
+    fn return_function_end(&self, signature_returns: &[ValueType]) {
+        self.return_from_context(signature_returns, || {
+            self.stack.borrow_mut().pop_function_state()
+        })
+    }
+
+    fn return_immediate(&self, signature_returns: &[ValueType]) {
+        self.return_from_context(signature_returns, || {
+            self.stack.borrow_mut().pop_until_function_state()
+        })
     }
 
     pub fn execute(self) {
@@ -402,14 +421,14 @@ impl<'a> Runtime<'a> {
 
                     match index {
                         function_state::InstructionIndex::IndexInFunction(_) => {
-                            self.return_from_function(&current_function.signature.returns);
+                            self.return_function_end(&current_function.signature.returns);
                             self.function_depth.set(self.function_depth.get() - 1);
                         }
                         function_state::InstructionIndex::IndexInBlock { block_idx, .. } => {
                             let block_type =
                                 current_function.code.instructions.get_block_type(block_idx);
                             let block_type_slice = block_type_to_slice!(block_type);
-                            self.return_from_function(block_type_slice)
+                            self.return_function_end(block_type_slice)
                         }
                     }
                     continue;
