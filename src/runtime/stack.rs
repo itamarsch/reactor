@@ -1,4 +1,11 @@
-use super::{function_state::FunctionState, value::Value};
+use core::panic;
+
+use crate::types::BlockIdx;
+
+use super::{
+    function_state::{FunctionState, InstructionIndex},
+    value::Value,
+};
 
 #[derive(Debug)]
 pub struct Stack {
@@ -8,6 +15,11 @@ pub struct Stack {
 impl Stack {
     pub fn new() -> Self {
         Self { stack: vec![] }
+    }
+
+    pub fn push_bool(&mut self, value: bool) {
+        let value = if value { 1 } else { 0 };
+        self.push_i32(value);
     }
 
     pub fn push_i32(&mut self, value: i32) {
@@ -88,6 +100,35 @@ impl Stack {
 
     pub fn drop(&mut self) {
         self.stack.pop();
+    }
+
+    pub fn break_from_block(&mut self, block_idx: BlockIdx) -> FunctionState {
+        let mut found_block = false;
+        loop {
+            let pop = self.stack.pop().expect("Popped all stack while breaking");
+            match pop {
+                StackValue::Value(_) => {
+                    continue;
+                }
+                StackValue::Function(f) => {
+                    if !found_block {
+                        match f.instruction_index() {
+                            InstructionIndex::IndexInFunction(_) => {
+                                panic!("Break out of function call not possible")
+                            }
+                            InstructionIndex::IndexInBlock {
+                                block_idx: poped_block_index,
+                                ..
+                            } => {
+                                found_block = poped_block_index == block_idx;
+                            }
+                        }
+                    } else {
+                        return f;
+                    }
+                }
+            };
+        }
     }
 }
 

@@ -31,8 +31,8 @@ pub enum Instruction {
         if_expr: BlockIdx,
         else_expr: BlockIdx,
     },
-    Break(LabelIdx),
-    BreakIf(LabelIdx),
+    Break(BlockIdx),
+    BreakIf(BlockIdx),
     BreakTable {
         labels: Vec<LabelIdx>,
         default: LabelIdx,
@@ -235,6 +235,13 @@ impl Instruction {
         blocks: Rc<RefCell<Blocks>>,
         block_stack: Rc<RefCell<Vec<BlockIdx>>>,
     ) -> IResult<&[u8], Instruction> {
+        let block_stack_c = block_stack.clone();
+        let label_index_to_block_index = move |LabelIdx(idx)| {
+            let block_stack = block_stack_c.deref().borrow();
+            let block_stack_index = block_stack.len() - 1 - idx as usize;
+            block_stack[block_stack_index]
+        };
+
         let (input, value) = u8(input)?;
         let (input, instruction) = match value {
             0x00 => (input, Instruction::Unreachable),
@@ -243,11 +250,9 @@ impl Instruction {
                 let (input, block_type) = BlockType::parse(input)?;
                 let idx = blocks.deref().borrow_mut().new_block();
                 block_stack.deref().borrow_mut().push(idx);
-                println!("{:?}", block_stack.deref().borrow());
                 let (input, expr) =
                     Instructions::parse(input, blocks.clone(), block_stack.clone())?;
                 let idx_popped = block_stack.deref().borrow_mut().pop();
-                println!("{:?}", block_stack.deref().borrow());
                 assert_eq!(Some(idx), idx_popped);
 
                 blocks
@@ -268,22 +273,18 @@ impl Instruction {
                 let (input, block_type) = BlockType::parse(input)?;
                 let if_idx = blocks.deref().borrow_mut().new_block();
                 block_stack.deref().borrow_mut().push(if_idx);
-                println!("{:?}", block_stack.deref().borrow());
                 let (input, (if_expr, has_else)) =
                     Instructions::parse_if_block(input, blocks.clone(), block_stack.clone())?;
                 let if_popped = block_stack.deref().borrow_mut().pop();
-                println!("{:?}", block_stack.deref().borrow());
 
                 let else_idx = blocks.deref().borrow_mut().new_block();
                 block_stack.deref().borrow_mut().push(else_idx);
-                println!("{:?}", block_stack.deref().borrow());
                 let (input, else_expr) = if has_else {
                     Instructions::parse(input, blocks.clone(), block_stack.clone())?
                 } else {
                     (input, Instructions::empty())
                 };
                 let else_popped = block_stack.deref().borrow_mut().pop();
-                println!("{:?}", block_stack.deref().borrow());
                 assert_eq!(Some(if_idx), if_popped);
                 assert_eq!(Some(else_idx), else_popped);
                 blocks
@@ -305,12 +306,14 @@ impl Instruction {
             }
             0x0c | 0x0d => {
                 let (input, label_idx) = LabelIdx::parse(input)?;
+                let block_idx = label_index_to_block_index(label_idx);
+
                 (
                     input,
                     if value == 0x0c {
-                        Instruction::Break(label_idx)
+                        Instruction::Break(block_idx)
                     } else {
-                        Instruction::BreakIf(label_idx)
+                        Instruction::BreakIf(block_idx)
                     },
                 )
             }

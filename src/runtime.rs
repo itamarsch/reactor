@@ -5,7 +5,10 @@ use std::{
 };
 
 use crate::{
-    module::{functions::Function, Module},
+    module::{
+        functions::{Function, LocalFunction},
+        Module,
+    },
     runtime::{locals::Locals, value::Value},
     types::{BlockIdx, FuncIdx, Instruction, NumericValueType, ValueType},
 };
@@ -23,6 +26,15 @@ pub struct Runtime<'a> {
     module: Module<'a>,
     current_function_state: RefCell<FunctionState>,
     function_depth: Cell<usize>,
+}
+
+macro_rules! block_type_to_slice {
+    ($block_type:expr) => {
+        match $block_type.0 {
+            Some(t) => &[t][..],
+            None => &[][..],
+        }
+    };
 }
 
 impl<'a> Runtime<'a> {
@@ -93,17 +105,43 @@ impl<'a> Runtime<'a> {
         }
     }
 
-    fn run_instruction(&self, instruction: &Instruction) {
+    fn break_from_block(&self, break_from_idx: BlockIdx, current_function: &LocalFunction) {
+        let block_type = current_function
+            .code
+            .instructions
+            .get_block_type(break_from_idx);
+        let block_type_slice = block_type_to_slice!(block_type);
+        let mut block_returns = self.pop_returns(block_type_slice);
+        self.stack
+            .borrow_mut()
+            .push_function_state(self.current_function_state.borrow().clone());
+        let new_function_state = self.stack.borrow_mut().break_from_block(break_from_idx);
+        self.reassemble_returns(&mut block_returns);
+        *self.current_function_state.borrow_mut() = new_function_state;
+    }
+
+    fn run_instruction(&self, instruction: &Instruction, current_function: &LocalFunction) {
         match instruction {
-            Instruction::Block(block_idx) => self.execute_block(*block_idx),
+            Instruction::Block(block_idx) => self.execute_block(*block_idx, false),
+            Instruction::Loop(block_idx) => self.execute_block(*block_idx, true),
             Instruction::If { if_expr, else_expr } => {
                 let condition = self.stack.borrow_mut().pop_bool();
                 if condition {
-                    self.execute_block(*if_expr);
+                    self.execute_block(*if_expr, false);
                 } else {
-                    self.execute_block(*else_expr);
+                    self.execute_block(*else_expr, false);
                 }
             }
+            Instruction::Break(break_from_idx) => {
+                self.break_from_block(*break_from_idx, current_function)
+            }
+            Instruction::BreakIf(break_from_idx) => {
+                let should_break = self.stack.borrow_mut().pop_bool();
+                if should_break {
+                    self.break_from_block(*break_from_idx, current_function);
+                }
+            }
+
             Instruction::Call(func_idx) => {
                 self.call_function(*func_idx);
             }
@@ -132,6 +170,10 @@ impl<'a> Runtime<'a> {
             }
             Instruction::F64Const(value) => {
                 self.stack.borrow_mut().push_f64(*value);
+            }
+            Instruction::I32Eqz => {
+                let a = self.stack.borrow_mut().pop_i32();
+                self.stack.borrow_mut().push_bool(a == 0);
             }
             Instruction::I32Add => {
                 let b = self.stack.borrow_mut().pop_i32();
@@ -285,16 +327,18 @@ impl<'a> Runtime<'a> {
             ),
         }
         println!(
-            "Executed: {:?}, current state: {:?}, stack: {:?}",
+            "Executed: {:?}, current state: {:?}, stack: {:#?}\n",
             instruction,
             "",
-            "" // self.current_function_state.borrow(),
-               // self.stack.borrow()
+            self.stack.borrow() //self.current_function_state.borrow().deref(),
         );
     }
 
-    fn execute_block(&self, block_idx: BlockIdx) {
-        let mut new_function_state = self.current_function_state.borrow().new_block(block_idx);
+    fn execute_block(&self, block_idx: BlockIdx, is_loop: bool) {
+        let mut new_function_state = self
+            .current_function_state
+            .borrow()
+            .new_block(block_idx, is_loop);
         std::mem::swap(
             &mut new_function_state,
             self.current_function_state.borrow_mut().deref_mut(),
@@ -367,12 +411,10 @@ impl<'a> Runtime<'a> {
                             self.return_from_function(&current_function.signature.returns);
                             self.function_depth.set(self.function_depth.get() - 1);
                         }
-                        function_state::InstructionIndex::IndexInBlock(idx, _) => {
-                            let block_type = current_function.code.instructions.get_block_type(idx);
-                            let block_type_slice = match block_type.0 {
-                                Some(t) => &[t][..],
-                                None => &[][..],
-                            };
+                        function_state::InstructionIndex::IndexInBlock { block_idx, .. } => {
+                            let block_type =
+                                current_function.code.instructions.get_block_type(block_idx);
+                            let block_type_slice = block_type_to_slice!(block_type);
                             self.return_from_function(block_type_slice)
                         }
                     }
@@ -387,9 +429,11 @@ impl<'a> Runtime<'a> {
                 .instructions
                 .get_instruction(self.current_function_state.borrow().instruction_index());
 
-            self.current_function_state.borrow_mut().next_instruction();
+            self.current_function_state
+                .borrow_mut()
+                .next_instruction(current_function);
 
-            self.run_instruction(instruction);
+            self.run_instruction(instruction, current_function);
         }
     }
 }

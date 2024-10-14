@@ -1,19 +1,26 @@
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
-use crate::types::{BlockIdx, FuncIdx, LocalIdx};
+use crate::{
+    module::functions::LocalFunction,
+    types::{BlockIdx, FuncIdx, LocalIdx},
+};
 
 use super::{locals::Locals, value::Value};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InstructionIndex {
     IndexInFunction(usize),
-    IndexInBlock(BlockIdx, usize),
+    IndexInBlock {
+        block_idx: BlockIdx,
+        index_in_block: usize,
+        is_loop: bool,
+    },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct InstructionPosition(FuncIdx, InstructionIndex);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionState {
     locals: Rc<RefCell<Locals>>,
     instruction_position: InstructionPosition,
@@ -27,12 +34,16 @@ impl FunctionState {
         }
     }
 
-    pub fn new_block(&self, block_idx: BlockIdx) -> Self {
+    pub fn new_block(&self, block_idx: BlockIdx, is_loop: bool) -> Self {
         Self {
             locals: self.locals.clone(),
             instruction_position: InstructionPosition(
                 self.instruction_position.0,
-                InstructionIndex::IndexInBlock(block_idx, 0),
+                InstructionIndex::IndexInBlock {
+                    block_idx,
+                    index_in_block: 0,
+                    is_loop,
+                },
             ),
         }
     }
@@ -56,17 +67,28 @@ impl FunctionState {
     pub fn in_block(&self) -> bool {
         matches!(
             self.instruction_position.1,
-            InstructionIndex::IndexInBlock(_, _)
+            InstructionIndex::IndexInBlock { .. }
         )
     }
 
-    pub fn next_instruction(&mut self) {
+    pub fn next_instruction(&mut self, code: &LocalFunction) {
         match &mut self.instruction_position.1 {
             InstructionIndex::IndexInFunction(ref mut i) => {
                 *i += 1;
             }
-            InstructionIndex::IndexInBlock(_, ref mut i) => {
+            InstructionIndex::IndexInBlock {
+                block_idx,
+                index_in_block: ref mut i,
+                is_loop,
+            } => {
                 *i += 1;
+                if *is_loop {
+                    let amount_of_instructions_in_block = code
+                        .code
+                        .instructions
+                        .amount_of_instructions_in_block(*block_idx);
+                    *i %= amount_of_instructions_in_block;
+                }
             }
         }
     }

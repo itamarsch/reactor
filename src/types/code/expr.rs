@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     cell::{OnceCell, Ref, RefCell},
     ops::Deref,
     rc::Rc,
@@ -45,13 +44,21 @@ impl Expr {
         }
     }
 
+    pub fn amount_of_instructions_in_block(&self, block_idx: BlockIdx) -> usize {
+        self.blocks.deref().borrow().get(block_idx).0.len()
+    }
+
     pub fn get_instruction(&self, state: InstructionIndex) -> Ref<Instruction> {
         match state {
             InstructionIndex::IndexInFunction(i) => {
                 let expr = self.expr.borrow();
                 Ref::map(expr, |expr| &expr[i])
             }
-            InstructionIndex::IndexInBlock(block_idx, i) => {
+            InstructionIndex::IndexInBlock {
+                block_idx,
+                index_in_block: i,
+                ..
+            } => {
                 let blocks = self.blocks.deref().borrow();
                 Ref::map(blocks, |blocks| {
                     let current_block = &blocks.get(block_idx);
@@ -63,7 +70,11 @@ impl Expr {
     pub fn done(&self, state: InstructionIndex) -> bool {
         match state {
             InstructionIndex::IndexInFunction(i) => self.expr.borrow().0.len() == i,
-            InstructionIndex::IndexInBlock(block_idx, i) => {
+            InstructionIndex::IndexInBlock {
+                block_idx,
+                index_in_block: i,
+                ..
+            } => {
                 self.blocks
                     .deref()
                     .borrow()
