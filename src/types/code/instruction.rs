@@ -6,7 +6,7 @@ use nom::{
         complete::{f32, f64, u8},
         Endianness,
     },
-    IResult,
+    IResult, Parser,
 };
 use nom_leb128::{leb128_i32, leb128_i64, leb128_u32};
 
@@ -34,8 +34,8 @@ pub enum Instruction {
     Break(BlockIdx),
     BreakIf(BlockIdx),
     BreakTable {
-        labels: Vec<LabelIdx>,
-        default: LabelIdx,
+        labels: Vec<BlockIdx>,
+        default: BlockIdx,
     },
     Return,
     Call(FuncIdx),
@@ -318,8 +318,11 @@ impl Instruction {
                 )
             }
             0x0e => {
-                let (input, labels) = wasm_vec(LabelIdx::parse)(input)?;
-                let (input, default_label) = LabelIdx::parse(input)?;
+                let (input, labels) =
+                    wasm_vec(LabelIdx::parse.map(&label_index_to_block_index))(input)?;
+                let (input, default_label) = LabelIdx::parse
+                    .map(&label_index_to_block_index)
+                    .parse(input)?;
                 (
                     input,
                     Instruction::BreakTable {

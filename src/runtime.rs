@@ -141,6 +141,11 @@ impl<'a> Runtime<'a> {
                     self.break_from_block(*break_from_idx, current_function);
                 }
             }
+            Instruction::BreakTable { labels, default } => {
+                let index = self.stack.borrow_mut().pop_i32() as usize;
+                let block_index = *labels.get(index).unwrap_or(default);
+                self.break_from_block(block_index, current_function);
+            }
 
             Instruction::Call(func_idx) => {
                 self.call_function(*func_idx);
