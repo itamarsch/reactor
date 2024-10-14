@@ -1,9 +1,6 @@
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
-use crate::{
-    module::functions::LocalFunction,
-    types::{BlockIdx, FuncIdx, LocalIdx},
-};
+use crate::types::{BlockIdx, FuncIdx, LocalIdx};
 
 use super::{locals::Locals, value::Value};
 
@@ -13,7 +10,6 @@ pub enum InstructionIndex {
     IndexInBlock {
         block_idx: BlockIdx,
         index_in_block: usize,
-        is_loop: bool,
     },
 }
 
@@ -34,7 +30,7 @@ impl FunctionState {
         }
     }
 
-    pub fn new_block(&self, block_idx: BlockIdx, is_loop: bool) -> Self {
+    pub fn new_block(&self, block_idx: BlockIdx) -> Self {
         Self {
             locals: self.locals.clone(),
             instruction_position: InstructionPosition(
@@ -42,7 +38,6 @@ impl FunctionState {
                 InstructionIndex::IndexInBlock {
                     block_idx,
                     index_in_block: 0,
-                    is_loop,
                 },
             ),
         }
@@ -71,25 +66,25 @@ impl FunctionState {
         )
     }
 
-    pub fn next_instruction(&mut self, code: &LocalFunction) {
-        match &mut self.instruction_position.1 {
-            InstructionIndex::IndexInFunction(ref mut i) => {
-                *i += 1;
-            }
+    pub fn repeat_instruction(&mut self) {
+        let i = match &mut self.instruction_position.1 {
+            InstructionIndex::IndexInFunction(ref mut i) => i,
             InstructionIndex::IndexInBlock {
-                block_idx,
                 index_in_block: ref mut i,
-                is_loop,
-            } => {
-                *i += 1;
-                if *is_loop {
-                    let amount_of_instructions_in_block = code
-                        .code
-                        .instructions
-                        .amount_of_instructions_in_block(*block_idx);
-                    *i %= amount_of_instructions_in_block;
-                }
-            }
-        }
+                ..
+            } => i,
+        };
+        *i -= 1;
+    }
+
+    pub fn next_instruction(&mut self) {
+        let i = match &mut self.instruction_position.1 {
+            InstructionIndex::IndexInFunction(ref mut i) => i,
+            InstructionIndex::IndexInBlock {
+                index_in_block: ref mut i,
+                ..
+            } => i,
+        };
+        *i += 1;
     }
 }

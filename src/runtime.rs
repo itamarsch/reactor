@@ -1,6 +1,6 @@
 use std::{
     cell::{Cell, RefCell},
-    ops::DerefMut,
+    ops::{Deref, DerefMut},
     process::exit,
 };
 
@@ -116,20 +116,29 @@ impl<'a> Runtime<'a> {
             .push_function_state(self.current_function_state.borrow().clone());
 
         self.return_from_context(block_type_slice, || {
-            self.stack.borrow_mut().break_from_block(break_from_idx)
+            let mut new_function_state = self.stack.borrow_mut().break_from_block(break_from_idx);
+            if current_function
+                .code
+                .instructions
+                .is_block_loop(break_from_idx)
+            {
+                new_function_state.repeat_instruction();
+            }
+            new_function_state
         });
     }
 
     fn run_instruction(&self, instruction: &Instruction, current_function: &LocalFunction) {
         match instruction {
-            Instruction::Block(block_idx) => self.execute_block(*block_idx, false),
-            Instruction::Loop(block_idx) => self.execute_block(*block_idx, true),
+            Instruction::Block(block_idx) => self.execute_block(*block_idx),
+            Instruction::Loop(block_idx) => self.execute_block(*block_idx),
             Instruction::If { if_expr, else_expr } => {
                 let condition = self.stack.borrow_mut().pop_bool();
+                println!("If condition: {}", condition);
                 if condition {
-                    self.execute_block(*if_expr, false);
+                    self.execute_block(*if_expr);
                 } else {
-                    self.execute_block(*else_expr, false);
+                    self.execute_block(*else_expr);
                 }
             }
             Instruction::Break(break_from_idx) => {
@@ -147,6 +156,9 @@ impl<'a> Runtime<'a> {
                 self.break_from_block(block_index, current_function);
             }
             Instruction::Return => {
+                if self.function_depth.get() == 0 {
+                    exit(0);
+                }
                 self.return_immediate(&current_function.signature.returns[..]);
             }
 
@@ -183,6 +195,12 @@ impl<'a> Runtime<'a> {
                 let a = self.stack.borrow_mut().pop_i32();
                 self.stack.borrow_mut().push_bool(a == 0);
             }
+            Instruction::I32GeS => {
+                let b = self.stack.borrow_mut().pop_i32();
+                let a = self.stack.borrow_mut().pop_i32();
+                println!("{} >= {}", a, b);
+                self.stack.borrow_mut().push_bool(a >= b);
+            }
             Instruction::I32Add => {
                 let b = self.stack.borrow_mut().pop_i32();
                 let a = self.stack.borrow_mut().pop_i32();
@@ -211,6 +229,11 @@ impl<'a> Runtime<'a> {
                 let b = self.stack.borrow_mut().pop_i32();
                 let a = self.stack.borrow_mut().pop_i32();
                 self.stack.borrow_mut().push_i32(a % b);
+            }
+            Instruction::I64Eqz => {
+                let a = self.stack.borrow_mut().pop_i64();
+                println!("Eqz: {}", a);
+                self.stack.borrow_mut().push_bool(a == 0);
             }
             Instruction::I64Add => {
                 let b = self.stack.borrow_mut().pop_i64();
@@ -337,16 +360,16 @@ impl<'a> Runtime<'a> {
         println!(
             "Executed: {:?}, current state: {:?}, stack: {:#?}\n",
             instruction,
-            "",
-            self.stack.borrow() //self.current_function_state.borrow().deref(),
+            "", //self.stack.borrow(),
+            self.current_function_state
+                .borrow()
+                .deref()
+                .instruction_index(),
         );
     }
 
-    fn execute_block(&self, block_idx: BlockIdx, is_loop: bool) {
-        let mut new_function_state = self
-            .current_function_state
-            .borrow()
-            .new_block(block_idx, is_loop);
+    fn execute_block(&self, block_idx: BlockIdx) {
+        let mut new_function_state = self.current_function_state.borrow().new_block(block_idx);
         std::mem::swap(
             &mut new_function_state,
             self.current_function_state.borrow_mut().deref_mut(),
@@ -393,7 +416,9 @@ impl<'a> Runtime<'a> {
 
     fn return_immediate(&self, signature_returns: &[ValueType]) {
         self.return_from_context(signature_returns, || {
-            self.stack.borrow_mut().pop_until_function_state()
+            self.stack
+                .borrow_mut()
+                .pop_until_function_state(self.current_function_state.borrow().deref())
         })
     }
 
@@ -442,9 +467,7 @@ impl<'a> Runtime<'a> {
                 .instructions
                 .get_instruction(self.current_function_state.borrow().instruction_index());
 
-            self.current_function_state
-                .borrow_mut()
-                .next_instruction(current_function);
+            self.current_function_state.borrow_mut().next_instruction();
 
             self.run_instruction(instruction, current_function);
         }

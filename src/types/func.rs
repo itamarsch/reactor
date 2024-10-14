@@ -14,7 +14,7 @@ impl FuncTypeIdx {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FuncIdx(pub u32);
 impl FuncIdx {
     pub fn parse(input: &[u8]) -> IResult<&[u8], FuncIdx> {

@@ -118,20 +118,28 @@ impl Stack {
         self.stack.pop();
     }
 
-    pub fn pop_until_function_state(&mut self) -> FunctionState {
+    pub fn pop_until_function_state(&mut self, current_function: &FunctionState) -> FunctionState {
+        let mut found_block = false;
         loop {
-            match self.stack.pop().expect("Popped all stack while breaking") {
+            let pop = self.stack.pop().expect("Popped all stack while breaking");
+            match pop {
                 StackValue::Value(_) => {
                     continue;
                 }
-                StackValue::Function(f) => match f.instruction_index() {
-                    InstructionIndex::IndexInFunction(_) => {
+                StackValue::Function(f) => {
+                    if !found_block {
+                        match f.instruction_index() {
+                            InstructionIndex::IndexInFunction(_) => {
+                                found_block = f.function_idx() == current_function.function_idx();
+                            }
+                            InstructionIndex::IndexInBlock { .. } => {
+                                continue;
+                            }
+                        }
+                    } else {
                         return f;
                     }
-                    InstructionIndex::IndexInBlock { .. } => {
-                        continue;
-                    }
-                },
+                }
             };
         }
     }

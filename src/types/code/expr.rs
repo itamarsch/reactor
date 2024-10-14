@@ -37,6 +37,10 @@ impl Expr {
         Ref::map(block_ref, |blocks| &blocks.get(block_idx).1)
     }
 
+    pub fn is_block_loop(&self, block_idx: BlockIdx) -> bool {
+        self.blocks.deref().borrow().get(block_idx).is_loop()
+    }
+
     pub fn from_raw_instructions(instructions: Vec<Instruction>) -> Self {
         Self {
             expr: RefCell::new(Instructions(instructions)),
@@ -169,7 +173,7 @@ impl Instructions {
 }
 
 #[derive(Debug)]
-pub struct Block(Instructions, BlockType);
+pub struct Block(Instructions, BlockType, bool);
 impl Block {
     pub fn instructions(&self) -> &Instructions {
         &self.0
@@ -177,6 +181,10 @@ impl Block {
 
     pub fn block_type(&self) -> BlockType {
         self.1
+    }
+
+    pub fn is_loop(&self) -> bool {
+        self.2
     }
 }
 
@@ -197,9 +205,12 @@ impl Blocks {
         &mut self,
         expr: Instructions,
         block_type: BlockType,
+        is_loop: bool,
         BlockIdx(block_idx): BlockIdx,
     ) {
-        self.0[block_idx].set(Block(expr, block_type)).unwrap();
+        self.0[block_idx]
+            .set(Block(expr, block_type, is_loop))
+            .unwrap();
     }
 
     pub fn get(&self, BlockIdx(block_idx): BlockIdx) -> &Block {

@@ -258,7 +258,7 @@ impl Instruction {
                 blocks
                     .deref()
                     .borrow_mut()
-                    .set_new_block(expr, block_type, idx);
+                    .set_new_block(expr, block_type, value == 0x03, idx);
 
                 (
                     input,
@@ -290,11 +290,11 @@ impl Instruction {
                 blocks
                     .deref()
                     .borrow_mut()
-                    .set_new_block(if_expr, block_type, if_idx);
+                    .set_new_block(if_expr, block_type, false, if_idx);
                 blocks
                     .deref()
                     .borrow_mut()
-                    .set_new_block(else_expr, block_type, else_idx);
+                    .set_new_block(else_expr, block_type, false, else_idx);
 
                 (
                     input,
