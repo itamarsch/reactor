@@ -1,6 +1,6 @@
 use core::panic;
 
-use crate::types::BlockIdx;
+use crate::types::{BlockIdx, NumericValueType, ValueType};
 
 use super::{
     function_state::{FunctionState, InstructionIndex},
@@ -80,6 +80,22 @@ impl Stack {
     }
     pub fn pop_value(&mut self) -> Value {
         if let Some(StackValue::Value(value)) = self.stack.pop() {
+            value
+        } else {
+            panic!("Tried popping value from stack but failed")
+        }
+    }
+    pub fn pop_value_by_type(&mut self, value_type: ValueType) -> Value {
+        if let Some(StackValue::Value(value)) = self.stack.pop() {
+            match (value_type, value) {
+                (ValueType::Numeric(NumericValueType::I32), Value::I32(_))
+                | (ValueType::Numeric(NumericValueType::I64), Value::I64(_))
+                | (ValueType::Numeric(NumericValueType::F32), Value::F32(_))
+                | (ValueType::Numeric(NumericValueType::F64), Value::F64(_)) => {}
+                _ => {
+                    panic!("Tried popping: {:?} received: {:?}", value_type, value);
+                }
+            }
             value
         } else {
             panic!("Tried popping value from stack but failed")

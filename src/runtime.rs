@@ -10,7 +10,7 @@ use crate::{
         Module,
     },
     runtime::{locals::Locals, value::Value},
-    types::{BlockIdx, FuncIdx, Instruction, NumericValueType, ValueType},
+    types::{BlockIdx, FuncIdx, Instruction, ValueType},
 };
 
 use self::{function_state::FunctionState, stack::Stack};
@@ -355,22 +355,11 @@ impl<'a> Runtime<'a> {
     fn pop_returns(&self, signature_returns: &[ValueType]) -> Vec<Value> {
         let amount_of_returns = signature_returns.len();
         let mut returns = Vec::with_capacity(amount_of_returns);
-        for _ in 0..amount_of_returns {
-            let value = self.stack.borrow_mut().pop_value();
+        for return_type in signature_returns.iter().rev() {
+            let value = self.stack.borrow_mut().pop_value_by_type(*return_type);
             returns.push(value);
         }
 
-        for (signature, value) in signature_returns.iter().zip(returns.iter().rev()) {
-            match (signature, value) {
-                (ValueType::Numeric(NumericValueType::I32), Value::I32(_))
-                | (ValueType::Numeric(NumericValueType::I64), Value::I64(_))
-                | (ValueType::Numeric(NumericValueType::F32), Value::F32(_))
-                | (ValueType::Numeric(NumericValueType::F64), Value::F64(_)) => {}
-                _ => {
-                    panic!("Returns don't match signature of function, expected value of type: {:?} received: {:?}", signature, value);
-                }
-            }
-        }
         returns
     }
 
