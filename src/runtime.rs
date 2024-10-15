@@ -19,6 +19,10 @@ pub mod function_state;
 mod local;
 mod locals;
 mod stack;
+
+#[cfg(test)]
+mod test;
+
 mod value;
 
 pub struct Runtime<'a> {
@@ -111,11 +115,11 @@ impl<'a> Runtime<'a> {
             .instructions
             .get_block_type(break_from_idx);
         let block_type_slice = block_type_to_slice!(block_type);
-        self.stack
-            .borrow_mut()
-            .push_function_state(self.current_function_state.borrow().clone());
 
         self.return_from_context(block_type_slice, || {
+            self.stack
+                .borrow_mut()
+                .push_function_state(self.current_function_state.borrow().clone());
             let mut new_function_state = self.stack.borrow_mut().break_from_block(break_from_idx);
             if current_function
                 .code
@@ -194,6 +198,12 @@ impl<'a> Runtime<'a> {
             Instruction::I32Eqz => {
                 let a = self.stack.borrow_mut().pop_i32();
                 self.stack.borrow_mut().push_bool(a == 0);
+            }
+            Instruction::I32GtS => {
+                let b = self.stack.borrow_mut().pop_i32();
+                let a = self.stack.borrow_mut().pop_i32();
+                println!("{} >= {}", a, b);
+                self.stack.borrow_mut().push_bool(a > b);
             }
             Instruction::I32GeS => {
                 let b = self.stack.borrow_mut().pop_i32();
@@ -348,6 +358,10 @@ impl<'a> Runtime<'a> {
                 let a = self.stack.borrow_mut().pop_f32();
                 self.stack.borrow_mut().push_i64(a as i64);
             }
+            Instruction::I64TruncF64S => {
+                let a = self.stack.borrow_mut().pop_f64();
+                self.stack.borrow_mut().push_i64(a as i64);
+            }
             Instruction::F32ConvertI32S => {
                 let a = self.stack.borrow_mut().pop_i32();
                 self.stack.borrow_mut().push_f32(a as f32);
@@ -358,13 +372,10 @@ impl<'a> Runtime<'a> {
             ),
         }
         println!(
-            "Executed: {:?}, current state: {:?}, stack: {:#?}\n",
+            "Executed: {:?}, current state: {:#?}, stack: {:?}\n",
             instruction,
-            "", //self.stack.borrow(),
-            self.current_function_state
-                .borrow()
-                .deref()
-                .instruction_index(),
+            self.stack.borrow(),
+            "" //self.current_function_state .borrow() .deref() .instruction_index(),
         );
     }
 

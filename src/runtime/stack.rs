@@ -86,7 +86,9 @@ impl Stack {
         }
     }
     pub fn pop_value_by_type(&mut self, value_type: ValueType) -> Value {
-        if let Some(StackValue::Value(value)) = self.stack.pop() {
+        let poped_value = self.stack.pop();
+        println!("Poped: {:?}", poped_value);
+        if let Some(StackValue::Value(value)) = poped_value {
             match (value_type, value) {
                 (ValueType::Numeric(NumericValueType::I32), Value::I32(_))
                 | (ValueType::Numeric(NumericValueType::I64), Value::I64(_))
