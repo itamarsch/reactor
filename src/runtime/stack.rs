@@ -26,8 +26,16 @@ impl Stack {
         self.stack.push(StackValue::Value(Value::I32(value)))
     }
 
+    pub fn push_u32(&mut self, value: u32) {
+        self.push_i32(i32::from_le_bytes(value.to_le_bytes()))
+    }
+
     pub fn push_i64(&mut self, value: i64) {
         self.stack.push(StackValue::Value(Value::I64(value)))
+    }
+
+    pub fn push_u64(&mut self, value: u64) {
+        self.push_i64(i64::from_le_bytes(value.to_le_bytes()))
     }
 
     pub fn push_f32(&mut self, value: f32) {
@@ -51,12 +59,20 @@ impl Stack {
         }
     }
 
+    pub fn pop_u32(&mut self) -> u32 {
+        u32::from_le_bytes(self.pop_i32().to_le_bytes())
+    }
+
     pub fn pop_i64(&mut self) -> i64 {
         if let Some(StackValue::Value(Value::I64(value))) = self.stack.pop() {
             value
         } else {
             panic!("Tried popping i64 from stack but failed")
         }
+    }
+
+    pub fn pop_u64(&mut self) -> u64 {
+        u64::from_le_bytes(self.pop_i64().to_le_bytes())
     }
 
     pub fn pop_f32(&mut self) -> f32 {

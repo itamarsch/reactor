@@ -24,6 +24,24 @@ mod stack;
 mod test;
 
 mod value;
+use paste::paste;
+
+macro_rules! numeric_operation {
+    (
+        $self:expr,
+        pops { $( $ident:ident : $type:ident ),* $(,)? },
+        push $result_type:ident => $expr:expr
+    ) => {
+        {
+            paste! {
+                $(
+                    let $ident = $self.stack.borrow_mut().[<pop_ $type>]();
+                )*
+                $self.stack.borrow_mut().[<push_ $result_type>]($expr);
+            }
+        }
+    };
+}
 
 pub struct Runtime<'a> {
     stack: RefCell<Stack>,
@@ -195,192 +213,217 @@ impl<'a> Runtime<'a> {
                 self.stack.borrow_mut().push_f64(*value);
             }
             Instruction::I32Eqz => {
-                let a = self.stack.borrow_mut().pop_i32();
-                self.stack.borrow_mut().push_bool(a == 0);
+                numeric_operation!(self,
+                    pops { a: i32, },
+                    push bool => a == 0
+                );
             }
             Instruction::I32Ne => {
-                let b = self.stack.borrow_mut().pop_i32();
-                let a = self.stack.borrow_mut().pop_i32();
-                self.stack.borrow_mut().push_bool(a != b);
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push bool => a != b
+                );
             }
             Instruction::I32GtS => {
-                let b = self.stack.borrow_mut().pop_i32();
-                let a = self.stack.borrow_mut().pop_i32();
-                self.stack.borrow_mut().push_bool(a > b);
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push bool => a > b
+                );
             }
             Instruction::I32GeS => {
-                let b = self.stack.borrow_mut().pop_i32();
-                let a = self.stack.borrow_mut().pop_i32();
-                self.stack.borrow_mut().push_bool(a >= b);
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push bool => a >= b
+                );
             }
             Instruction::I32Add => {
-                let b = self.stack.borrow_mut().pop_i32();
-                let a = self.stack.borrow_mut().pop_i32();
-
-                self.stack.borrow_mut().push_i32(a.wrapping_add(b));
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push i32 => a.wrapping_add(b)
+                );
             }
             Instruction::I32Sub => {
-                let b = self.stack.borrow_mut().pop_i32();
-                let a = self.stack.borrow_mut().pop_i32();
-
-                self.stack.borrow_mut().push_i32(a.wrapping_sub(b));
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push i32 => a.wrapping_sub(b)
+                );
             }
             Instruction::I32Mul => {
-                let b = self.stack.borrow_mut().pop_i32();
-                let a = self.stack.borrow_mut().pop_i32();
-
-                self.stack.borrow_mut().push_i32(a.wrapping_mul(b));
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push i32 => a.wrapping_mul(b)
+                );
             }
             Instruction::I32DivS => {
-                let b = self.stack.borrow_mut().pop_i32();
-                let a = self.stack.borrow_mut().pop_i32();
-
-                self.stack.borrow_mut().push_i32(a / b);
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push i32 => a / b
+                );
             }
             Instruction::I32RemS => {
-                let b = self.stack.borrow_mut().pop_i32();
-                let a = self.stack.borrow_mut().pop_i32();
-                self.stack.borrow_mut().push_i32(a % b);
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push i32 => a % b
+                );
             }
             Instruction::I64Eqz => {
-                let a = self.stack.borrow_mut().pop_i64();
-                self.stack.borrow_mut().push_bool(a == 0);
+                numeric_operation!(self,
+                    pops { a: i64 },
+                    push bool => a == 0
+                );
             }
             Instruction::I64Add => {
-                let b = self.stack.borrow_mut().pop_i64();
-                let a = self.stack.borrow_mut().pop_i64();
-                self.stack.borrow_mut().push_i64(a.wrapping_add(b));
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push i64 => a.wrapping_add(b)
+                );
             }
             Instruction::I64Sub => {
-                let b = self.stack.borrow_mut().pop_i64();
-                let a = self.stack.borrow_mut().pop_i64();
-
-                self.stack.borrow_mut().push_i64(a.wrapping_sub(b));
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push i64 => a.wrapping_sub(b)
+                );
             }
-
             Instruction::I64Mul => {
-                let b = self.stack.borrow_mut().pop_i64();
-                let a = self.stack.borrow_mut().pop_i64();
-
-                self.stack.borrow_mut().push_i64(a.wrapping_mul(b));
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push i64 => a.wrapping_mul(b)
+                );
             }
             Instruction::I64DivS => {
-                let b = self.stack.borrow_mut().pop_i64();
-                let a = self.stack.borrow_mut().pop_i64();
-
-                self.stack.borrow_mut().push_i64(a / b);
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push i64 => a / b
+                );
             }
             Instruction::I64RemS => {
-                let b = self.stack.borrow_mut().pop_i64();
-                let a = self.stack.borrow_mut().pop_i64();
-                self.stack.borrow_mut().push_i64(a % b);
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push i64 => a % b
+                );
             }
             Instruction::I64ShrS => {
-                let b = self.stack.borrow_mut().pop_i64();
-                let a = self.stack.borrow_mut().pop_i64();
-                self.stack.borrow_mut().push_i64(a >> (b % 64));
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push i64 => a >> (b % 64)
+                );
             }
             Instruction::I64Shl => {
-                let b = self.stack.borrow_mut().pop_i64();
-                let a = self.stack.borrow_mut().pop_i64();
-                self.stack.borrow_mut().push_i64(a << (b % 64));
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push i64 => a << (b % 64)
+                );
             }
             Instruction::F32Add => {
-                let b = self.stack.borrow_mut().pop_f32();
-                let a = self.stack.borrow_mut().pop_f32();
-
-                self.stack.borrow_mut().push_f32(a + b);
+                numeric_operation!(self,
+                    pops { b: f32, a: f32 },
+                    push f32 => a + b
+                );
             }
-
             Instruction::F32Sub => {
-                let b = self.stack.borrow_mut().pop_f32();
-                let a = self.stack.borrow_mut().pop_f32();
-
-                self.stack.borrow_mut().push_f32(a - b);
+                numeric_operation!(self,
+                    pops { b: f32, a: f32 },
+                    push f32 => a - b
+                );
             }
             Instruction::F32Mul => {
-                let b = self.stack.borrow_mut().pop_f32();
-                let a = self.stack.borrow_mut().pop_f32();
-
-                self.stack.borrow_mut().push_f32(a * b);
+                numeric_operation!(self,
+                    pops { b: f32, a: f32 },
+                    push f32 => a * b
+                );
             }
             Instruction::F32Div => {
-                let b = self.stack.borrow_mut().pop_f32();
-                let a = self.stack.borrow_mut().pop_f32();
-
-                self.stack.borrow_mut().push_f32(a / b);
+                numeric_operation!(self,
+                    pops { b: f32, a: f32 },
+                    push f32 => a / b
+                );
             }
             Instruction::F32Sqrt => {
-                let a = self.stack.borrow_mut().pop_f32();
-                self.stack.borrow_mut().push_f32(a.sqrt());
+                numeric_operation!(self,
+                    pops { a: f32 },
+                    push f32 => a.sqrt()
+                );
             }
             Instruction::F64Add => {
-                let b = self.stack.borrow_mut().pop_f64();
-                let a = self.stack.borrow_mut().pop_f64();
-
-                self.stack.borrow_mut().push_f64(a + b);
+                numeric_operation!(self,
+                    pops { b: f64, a: f64 },
+                    push f64 => a + b
+                );
             }
             Instruction::F64Sub => {
-                let b = self.stack.borrow_mut().pop_f64();
-                let a = self.stack.borrow_mut().pop_f64();
-
-                self.stack.borrow_mut().push_f64(a - b);
+                numeric_operation!(self,
+                    pops { b: f64, a: f64 },
+                    push f64 => a - b
+                );
             }
             Instruction::F64Mul => {
-                let b = self.stack.borrow_mut().pop_f64();
-                let a = self.stack.borrow_mut().pop_f64();
-
-                self.stack.borrow_mut().push_f64(a * b);
+                numeric_operation!(self,
+                    pops { b: f64, a: f64 },
+                    push f64 => a * b
+                );
             }
             Instruction::F64Div => {
-                let b = self.stack.borrow_mut().pop_f64();
-                let a = self.stack.borrow_mut().pop_f64();
-
-                self.stack.borrow_mut().push_f64(a / b);
+                numeric_operation!(self,
+                    pops { b: f64, a: f64 },
+                    push f64 => a / b
+                );
             }
-
             Instruction::I32WrapI64 => {
-                let a = self.stack.borrow_mut().pop_i64();
-                self.stack.borrow_mut().push_i32(a as i32);
+                numeric_operation!(self,
+                    pops { a: i64 },
+                    push i32 => a as i32
+                );
             }
             Instruction::I32TruncF32S => {
-                let a = self.stack.borrow_mut().pop_f32();
-                self.stack.borrow_mut().push_i32(a as i32);
+                numeric_operation!(self,
+                    pops { a: f32 },
+                    push i32 => a as i32
+                );
             }
             Instruction::I32TruncF64S => {
-                let a = self.stack.borrow_mut().pop_f64();
-                self.stack.borrow_mut().push_i32(a as i32);
+                numeric_operation!(self,
+                    pops { a: f64 },
+                    push i32 => a as i32
+                );
             }
             Instruction::I64ExtendI32S => {
-                let a = self.stack.borrow_mut().pop_i32();
-                self.stack.borrow_mut().push_i64(a as i64);
+                numeric_operation!(self,
+                    pops { a: i32 },
+                    push i64 => a as i64
+                );
             }
             Instruction::I64TruncF32S => {
-                let a = self.stack.borrow_mut().pop_f32();
-                self.stack.borrow_mut().push_i64(a as i64);
+                numeric_operation!(self,
+                    pops { a: f32 },
+                    push i64 => a as i64
+                );
             }
             Instruction::I64TruncF64S => {
-                let a = self.stack.borrow_mut().pop_f64();
-                self.stack.borrow_mut().push_i64(a as i64);
+                numeric_operation!(self,
+                    pops { a: f64 },
+                    push i64 => a as i64
+                );
             }
             Instruction::F32ConvertI32S => {
-                let a = self.stack.borrow_mut().pop_i32();
-                self.stack.borrow_mut().push_f32(a as f32);
+                numeric_operation!(self,
+                    pops { a: i32 },
+                    push f32 => a as f32
+                );
             }
             _ => panic!(
                 "Instruction: {:?} not implemented {:?}",
                 instruction, self.stack
             ),
         }
-        println!(
-            "Executed: {:?}, current state: {:#?}, stack: {:?}\n",
-            instruction,
-            self.stack.borrow(),
-            self.current_function_state
-                .borrow()
-                .deref()
-                .instruction_index(),
-        );
+        // println!(
+        //     "Executed: {:?}, current state: {:#?}, stack: {:?}\n",
+        //     instruction,
+        //     self.stack.borrow(),
+        //     self.current_function_state
+        //         .borrow()
+        //         .deref()
+        //         .instruction_index(),
+        // );
     }
 
     fn execute_block(&self, block_idx: BlockIdx) {
