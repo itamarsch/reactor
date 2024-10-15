@@ -138,7 +138,6 @@ impl<'a> Runtime<'a> {
             Instruction::Loop(block_idx) => self.execute_block(*block_idx),
             Instruction::If { if_expr, else_expr } => {
                 let condition = self.stack.borrow_mut().pop_bool();
-                println!("If condition: {}", condition);
                 if condition {
                     self.execute_block(*if_expr);
                 } else {
@@ -199,16 +198,19 @@ impl<'a> Runtime<'a> {
                 let a = self.stack.borrow_mut().pop_i32();
                 self.stack.borrow_mut().push_bool(a == 0);
             }
+            Instruction::I32Ne => {
+                let b = self.stack.borrow_mut().pop_i32();
+                let a = self.stack.borrow_mut().pop_i32();
+                self.stack.borrow_mut().push_bool(a != b);
+            }
             Instruction::I32GtS => {
                 let b = self.stack.borrow_mut().pop_i32();
                 let a = self.stack.borrow_mut().pop_i32();
-                println!("{} >= {}", a, b);
                 self.stack.borrow_mut().push_bool(a > b);
             }
             Instruction::I32GeS => {
                 let b = self.stack.borrow_mut().pop_i32();
                 let a = self.stack.borrow_mut().pop_i32();
-                println!("{} >= {}", a, b);
                 self.stack.borrow_mut().push_bool(a >= b);
             }
             Instruction::I32Add => {
@@ -242,7 +244,6 @@ impl<'a> Runtime<'a> {
             }
             Instruction::I64Eqz => {
                 let a = self.stack.borrow_mut().pop_i64();
-                println!("Eqz: {}", a);
                 self.stack.borrow_mut().push_bool(a == 0);
             }
             Instruction::I64Add => {
@@ -375,7 +376,10 @@ impl<'a> Runtime<'a> {
             "Executed: {:?}, current state: {:#?}, stack: {:?}\n",
             instruction,
             self.stack.borrow(),
-            "" //self.current_function_state .borrow() .deref() .instruction_index(),
+            self.current_function_state
+                .borrow()
+                .deref()
+                .instruction_index(),
         );
     }
 
