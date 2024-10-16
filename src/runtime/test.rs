@@ -4,7 +4,7 @@ use std::process::Command;
 
 #[test]
 fn test_wat_files() -> io::Result<()> {
-    let bin_dir = "./bin";
+    let bin_dir = "./test";
     let out_dir = "./out";
 
     // Ensure the output directory exists
