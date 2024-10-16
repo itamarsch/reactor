@@ -2,7 +2,7 @@ use nom::number::complete::u8;
 use nom::IResult;
 use nom_leb128::leb128_u32;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Limit {
     pub min: u32,
     pub max: Option<u32>,

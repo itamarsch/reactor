@@ -13,7 +13,8 @@ use crate::{
     types::{BlockIdx, FuncIdx, Instruction, ValueType},
 };
 
-use self::{function_state::FunctionState, stack::Stack};
+use self::{function_state::FunctionState, memory::Memory, stack::Stack};
+use paste::paste;
 
 pub mod function_state;
 mod local;
@@ -23,8 +24,16 @@ mod stack;
 #[cfg(test)]
 mod test;
 
+mod memory;
 mod value;
-use paste::paste;
+
+pub struct Runtime<'a> {
+    stack: RefCell<Stack>,
+    module: Module<'a>,
+    current_function_state: RefCell<FunctionState>,
+    function_depth: Cell<usize>,
+    memory: Memory,
+}
 
 macro_rules! numeric_operation {
     (
@@ -42,14 +51,6 @@ macro_rules! numeric_operation {
         }
     };
 }
-
-pub struct Runtime<'a> {
-    stack: RefCell<Stack>,
-    module: Module<'a>,
-    current_function_state: RefCell<FunctionState>,
-    function_depth: Cell<usize>,
-}
-
 macro_rules! block_type_to_slice {
     ($block_type:expr) => {
         match $block_type.0 {
@@ -76,6 +77,7 @@ impl<'a> Runtime<'a> {
         ));
 
         Runtime {
+            memory: Memory::new(module.memory_limit()),
             stack,
             module,
             current_function_state: initial_function_state,

@@ -7,7 +7,10 @@ use super::Limit;
 pub struct MemoryIdx(pub u32);
 impl MemoryIdx {
     pub fn parse(input: &[u8]) -> IResult<&[u8], MemoryIdx> {
-        leb128_u32(input).map(|(input, value)| (input, MemoryIdx(value)))
+        leb128_u32(input).map(|(input, value)| {
+            assert_eq!(value, 0, "Only one memory supported");
+            (input, MemoryIdx(value))
+        })
     }
 }
 
