@@ -32,7 +32,7 @@ pub struct Runtime<'a> {
     module: Module<'a>,
     current_function_state: RefCell<FunctionState>,
     function_depth: Cell<usize>,
-    memory: Memory,
+    memory: RefCell<Memory>,
 }
 
 macro_rules! numeric_operation {
@@ -51,6 +51,31 @@ macro_rules! numeric_operation {
         }
     };
 }
+
+macro_rules! memory_load {
+    ($self:expr, $ty:ident, $mem_func:ident, $memarg:expr) => {
+        paste! {
+            {
+                let address = $self.stack.borrow_mut().pop_i32();
+                let value = $self.memory.borrow_mut().$mem_func(address, *$memarg);
+                $self.stack.borrow_mut().[<push_ $ty>](value);
+            }
+        }
+    };
+}
+
+macro_rules! memory_store {
+    ($self:expr,$type:ident, $mem_func:ident, $memarg:expr) => {
+        paste! {
+            {
+                let value = $self.stack.borrow_mut().[<pop_ $type>]();
+                let address = $self.stack.borrow_mut().pop_i32();
+                $self.memory.borrow_mut().$mem_func(value, address, *$memarg);
+            }
+        }
+    };
+}
+
 macro_rules! block_type_to_slice {
     ($block_type:expr) => {
         match $block_type.0 {
@@ -77,7 +102,7 @@ impl<'a> Runtime<'a> {
         ));
 
         Runtime {
-            memory: Memory::new(module.memory_limit()),
+            memory: RefCell::new(Memory::new(module.memory_limit())),
             stack,
             module,
             current_function_state: initial_function_state,
@@ -201,6 +226,34 @@ impl<'a> Runtime<'a> {
                     .borrow_mut()
                     .set_local_value(*idx, value);
             }
+
+            Instruction::I32Load(memarg) => memory_load!(self, i32, load_i32, memarg),
+            Instruction::I64Load(memarg) => memory_load!(self, i64, load_i64, memarg),
+            Instruction::F32Load(memarg) => memory_load!(self, f32, load_f32, memarg),
+            Instruction::F64Load(memarg) => memory_load!(self, f64, load_f64, memarg),
+
+            Instruction::I32Load8S(memarg) => memory_load!(self, i32, load_i32_8, memarg),
+            Instruction::I32Load8U(memarg) => memory_load!(self, u32, load_u32_8, memarg),
+            Instruction::I32Load16S(memarg) => memory_load!(self, i32, load_i32_16, memarg),
+            Instruction::I32Load16U(memarg) => memory_load!(self, u32, load_u32_16, memarg),
+
+            Instruction::I64Load8S(memarg) => memory_load!(self, i64, load_i64_8, memarg),
+            Instruction::I64Load8U(memarg) => memory_load!(self, u64, load_u64_8, memarg),
+            Instruction::I64Load16S(memarg) => memory_load!(self, i64, load_i64_16, memarg),
+            Instruction::I64Load16U(memarg) => memory_load!(self, u64, load_u64_16, memarg),
+            Instruction::I64Load32S(memarg) => memory_load!(self, i64, load_i64_32, memarg),
+            Instruction::I64Load32U(memarg) => memory_load!(self, u64, load_u64_32, memarg),
+
+            Instruction::I32Store(memarg) => memory_store!(self, i32, store_i32, memarg),
+            Instruction::I64Store(memarg) => memory_store!(self, i64, store_i64, memarg),
+            Instruction::F32Store(memarg) => memory_store!(self, f32, store_f32, memarg),
+            Instruction::F64Store(memarg) => memory_store!(self, f64, store_f64, memarg),
+
+            Instruction::I32Store8(memarg) => memory_store!(self, i32, store_i32_8, memarg),
+            Instruction::I32Store16(memarg) => memory_store!(self, i32, store_i32_16, memarg),
+            Instruction::I64Store8(memarg) => memory_store!(self, i64, store_i64_8, memarg),
+            Instruction::I64Store16(memarg) => memory_store!(self, i64, store_i64_16, memarg),
+            Instruction::I64Store32(memarg) => memory_store!(self, i64, store_i64_32, memarg),
 
             Instruction::I32Const(value) => {
                 self.stack.borrow_mut().push_i32(*value);
@@ -410,6 +463,12 @@ impl<'a> Runtime<'a> {
                 numeric_operation!(self,
                     pops { a: i32 },
                     push f32 => a as f32
+                );
+            }
+            Instruction::F64ConvertI32S => {
+                numeric_operation!(self,
+                    pops { a: i32 },
+                    push f64 => a as f64
                 );
             }
             _ => panic!(
