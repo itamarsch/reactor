@@ -1,4 +1,5 @@
 use std::{
+    borrow::{Borrow, BorrowMut},
     cell::{Cell, RefCell},
     ops::{Deref, DerefMut},
     process::exit,
@@ -10,7 +11,7 @@ use crate::{
         Module,
     },
     runtime::{locals::Locals, value::Value},
-    types::{BlockIdx, FuncIdx, Instruction, ValueType},
+    types::{BlockIdx, Expr, FuncIdx, Instruction, ValueType},
 };
 
 use self::{function_state::FunctionState, memory::Memory, stack::Stack};
@@ -29,7 +30,7 @@ mod value;
 
 pub struct Runtime<'a> {
     stack: RefCell<Stack>,
-    module: Module<'a>,
+    module: RefCell<Module<'a>>,
     current_function_state: RefCell<FunctionState>,
     function_depth: Cell<usize>,
     memory: RefCell<Memory>,
@@ -101,13 +102,17 @@ impl<'a> Runtime<'a> {
             start_idx,
         ));
 
-        Runtime {
+        let runtime = Runtime {
             memory: RefCell::new(Memory::new(module.memory_limit())),
             stack,
-            module,
+            module: RefCell::new(module),
             current_function_state: initial_function_state,
             function_depth: Cell::new(0),
-        }
+        };
+
+        runtime.run_datas();
+
+        runtime
     }
 
     fn wasi_function(&self, name: &str) {
@@ -122,11 +127,47 @@ impl<'a> Runtime<'a> {
         }
     }
 
+    pub fn run_expr(&self, expr: Expr) {
+        let idx = self.module.borrow_mut().add_expr(expr);
+
+        // Swaped in next line
+        let mut function_state_before_expr = FunctionState::new_function(Locals::empty(), idx);
+        std::mem::swap(
+            &mut function_state_before_expr,
+            self.current_function_state.borrow_mut().deref_mut(),
+        );
+        self.execute();
+
+        std::mem::swap(
+            &mut function_state_before_expr,
+            self.current_function_state.borrow_mut().deref_mut(),
+        );
+        self.module.borrow_mut().remove_expr(idx);
+    }
+
+    fn run_datas(&self) {
+        let mut offset_calulations_to_run = vec![];
+        for (i, data) in self.module.borrow().datas().iter().enumerate() {
+            match data.mode {
+                crate::types::DataMode::Passive => continue,
+                crate::types::DataMode::Active { ref offset, .. } => {
+                    offset_calulations_to_run.push((offset.clone(), i))
+                }
+            }
+        }
+        for (offset_instructions, data_index) in offset_calulations_to_run {
+            self.run_expr(offset_instructions);
+            let offset = self.stack.borrow_mut().pop_i32();
+            self.memory
+                .borrow_mut()
+                .fill_data(offset, &self.module.borrow().datas()[data_index].init);
+            assert!(self.stack.borrow().is_empty(), "Stack is empty");
+        }
+    }
+
     fn call_function(&self, func_idx: FuncIdx) {
-        let next_function = self
-            .module
-            .get_function(func_idx)
-            .expect("Call instruction to have a valid function index");
+        let module_borrow = self.module.borrow();
+        let next_function = module_borrow.get_function(func_idx).unwrap();
         match next_function {
             Function::Local(function) => {
                 self.function_depth.set(self.function_depth.get() + 1);
@@ -497,6 +538,7 @@ impl<'a> Runtime<'a> {
             .borrow_mut()
             .push_function_state(new_function_state);
     }
+
     fn pop_returns(&self, signature_returns: &[ValueType]) -> Vec<Value> {
         let amount_of_returns = signature_returns.len();
         let mut returns = Vec::with_capacity(amount_of_returns);
@@ -504,7 +546,6 @@ impl<'a> Runtime<'a> {
             let value = self.stack.borrow_mut().pop_value_by_type(*return_type);
             returns.push(value);
         }
-
         returns
     }
 
@@ -541,11 +582,12 @@ impl<'a> Runtime<'a> {
         })
     }
 
-    pub fn execute(self) {
+    pub fn execute(&self) {
         loop {
-            let Some(Function::Local(current_function)) = self
-                .module
-                .get_function(self.current_function_state.borrow().function_idx())
+            let module_borrow = self.module.borrow();
+
+            let Some(Function::Local(current_function)) =
+                module_borrow.get_function(self.current_function_state.borrow().function_idx())
             else {
                 unreachable!(
                     "Current runing function cannot be imported and its index has to exist"

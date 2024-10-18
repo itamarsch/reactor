@@ -23,6 +23,10 @@ impl Locals {
         self.0[idx as usize].value()
     }
 
+    pub fn empty() -> Self {
+        Self(vec![])
+    }
+
     pub fn new_no_function_parameters(non_function_parameter_types: &LocalTypes) -> Locals {
         let locals = local_types_to_defaults(non_function_parameter_types);
         Locals(locals.collect())

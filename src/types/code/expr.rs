@@ -10,9 +10,9 @@ use crate::{runtime::function_state::InstructionIndex, types::BlockType};
 
 use super::{instruction::BlockIdx, Instruction};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Expr {
-    expr: RefCell<Instructions>,
+    expr: Rc<RefCell<Instructions>>,
     blocks: Rc<RefCell<Blocks>>,
 }
 
@@ -26,7 +26,7 @@ impl Expr {
         Ok((
             input,
             Self {
-                expr: RefCell::new(instructions),
+                expr: Rc::new(RefCell::new(instructions)),
                 blocks,
             },
         ))
@@ -43,7 +43,7 @@ impl Expr {
 
     pub fn from_raw_instructions(instructions: Vec<Instruction>) -> Self {
         Self {
-            expr: RefCell::new(Instructions(instructions)),
+            expr: Rc::new(RefCell::new(Instructions(instructions))),
             blocks: Rc::new(RefCell::new(Blocks::empty())),
         }
     }

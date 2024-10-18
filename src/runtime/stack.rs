@@ -17,6 +17,10 @@ impl Stack {
         Self { stack: vec![] }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.stack.is_empty()
+    }
+
     pub fn push_bool(&mut self, value: bool) {
         let value = if value { 1 } else { 0 };
         self.push_i32(value);

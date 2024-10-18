@@ -92,6 +92,12 @@ impl Memory {
         address
     }
 
+    pub fn fill_data(&mut self, address: i32, data: &[u8]) {
+        println!("Filling offset: {}, with data: {:?}", address, data);
+        let address = address as usize;
+        self.data[address..address + data.len()].copy_from_slice(data);
+    }
+
     // Use the macros to define all required functions
     // Basic load functions
     // Use the macros to define all required functions
