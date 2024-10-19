@@ -4,3 +4,4 @@ pub const VERSION: u32 = 1;
 
 pub mod module;
 pub mod runtime;
+pub mod wasi;

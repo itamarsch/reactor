@@ -1,5 +1,4 @@
 use std::{
-    borrow::{Borrow, BorrowMut},
     cell::{Cell, RefCell},
     ops::{Deref, DerefMut},
     process::exit,
@@ -12,6 +11,7 @@ use crate::{
     },
     runtime::{locals::Locals, value::Value},
     types::{BlockIdx, Expr, FuncIdx, Instruction, ValueType},
+    wasi::Wasi,
 };
 
 use self::{function_state::FunctionState, memory::Memory, stack::Stack};
@@ -20,12 +20,12 @@ use paste::paste;
 pub mod function_state;
 mod local;
 mod locals;
-mod stack;
+pub mod stack;
 
 #[cfg(test)]
 mod test;
 
-mod memory;
+pub mod memory;
 mod value;
 
 pub struct Runtime<'a> {
@@ -34,6 +34,7 @@ pub struct Runtime<'a> {
     current_function_state: RefCell<FunctionState>,
     function_depth: Cell<usize>,
     memory: RefCell<Memory>,
+    wasi: RefCell<Wasi>,
 }
 
 macro_rules! numeric_operation {
@@ -57,7 +58,7 @@ macro_rules! memory_load {
     ($self:expr, $ty:ident, $mem_func:ident, $memarg:expr) => {
         paste! {
             {
-                let address = $self.stack.borrow_mut().pop_i32();
+                let address = $self.stack.borrow_mut().pop_u32();
                 let value = $self.memory.borrow_mut().$mem_func(address, *$memarg);
                 $self.stack.borrow_mut().[<push_ $ty>](value);
             }
@@ -70,7 +71,7 @@ macro_rules! memory_store {
         paste! {
             {
                 let value = $self.stack.borrow_mut().[<pop_ $type>]();
-                let address = $self.stack.borrow_mut().pop_i32();
+                let address = $self.stack.borrow_mut().pop_u32();
                 $self.memory.borrow_mut().$mem_func(value, address, *$memarg);
             }
         }
@@ -108,6 +109,7 @@ impl<'a> Runtime<'a> {
             module: RefCell::new(module),
             current_function_state: initial_function_state,
             function_depth: Cell::new(0),
+            wasi: RefCell::new(Wasi::new()),
         };
 
         runtime.run_datas();
@@ -116,15 +118,11 @@ impl<'a> Runtime<'a> {
     }
 
     fn wasi_function(&self, name: &str) {
-        match name {
-            "proc_exit" => {
-                let exit_code = self.stack.borrow_mut().pop_i32();
-                exit(exit_code);
-            }
-            _ => {
-                panic!("Unknown wasi function: {}", name);
-            }
-        }
+        self.wasi.borrow_mut().run_function(
+            name,
+            self.stack.borrow_mut(),
+            self.memory.borrow_mut(),
+        );
     }
 
     pub fn run_expr(&self, expr: Expr) {
@@ -255,7 +253,7 @@ impl<'a> Runtime<'a> {
                 self.call_function(*func_idx);
             }
             Instruction::Drop => {
-                self.stack.borrow_mut().drop();
+                self.stack.borrow_mut().drop_value();
             }
             Instruction::LocalGet(idx) => {
                 let value = self.current_function_state.borrow().get_local_value(*idx);

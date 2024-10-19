@@ -135,7 +135,7 @@ impl Stack {
         }
     }
 
-    pub fn drop(&mut self) {
+    pub fn drop_value(&mut self) {
         self.stack.pop();
     }
 

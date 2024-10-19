@@ -1,7 +1,7 @@
 use nom::{sequence::pair, IResult};
 use nom_leb128::leb128_u32;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct MemoryArgument {
     pub align: u32,
     pub offset: u32,
