@@ -1,7 +1,7 @@
 use std::{
     cell::RefMut,
     io::{stdout, IoSlice, Write},
-    ops::DerefMut,
+    ops::Range,
     process::exit,
 };
 
@@ -28,6 +28,10 @@ impl IOVec {
             },
         ))
     }
+
+    pub fn as_range(&self) -> Range<usize> {
+        self.address..self.address + self.size
+    }
 }
 
 pub struct Wasi {}
@@ -52,14 +56,19 @@ impl Wasi {
 
                 let (_, iovs) =
                     count(
-                        IOVec::parse.map(|iov| {
-                            IoSlice::new(memory.get_range(iov.address..iov.address + iov.size))
-                        }),
+                        IOVec::parse.map(|iov| IoSlice::new(memory.get_range(iov.as_range()))),
                         amount_of_iovs,
                     )(memory.get_range(iov_addr..iov_addr + amount_of_iovs * 8))
                     .unwrap();
+
                 let result = self.write_iovs(fd, &iovs);
-                write_result(n_written_addr, memory.deref_mut(), result);
+                let (n_written, result) = match result {
+                    Ok(n) => (n as u32, WasiError::Success),
+                    Err(e) => (0, e),
+                };
+
+                memory.store_u32(n_written, n_written_addr);
+                stack.push_i32(result as u16 as i32);
             }
             _ => {
                 panic!("Unknown wasi function: {}", function_name);
@@ -67,9 +76,12 @@ impl Wasi {
         }
     }
 
-    fn write_iovs(&self, fd: i32, iovs: &[IoSlice]) -> Result<u32, WasiError> {
+    fn write_iovs(&self, fd: i32, iovs: &[IoSlice]) -> Result<usize, WasiError> {
         match fd {
-            1 => Ok(stdout().write_vectored(iovs).map_err(|err| err.kind())? as u32),
+            1 => stdout()
+                .write_vectored(iovs)
+                .map_err(|err| err.kind().into()),
+
             _ => {
                 panic!("Haven't implemented writing to files")
             }
@@ -78,23 +90,6 @@ impl Wasi {
 
     pub fn new() -> Self {
         Self {}
-    }
-}
-
-fn write_result(addr: u32, memory: &mut Memory, result: Result<u32, error::WasiError>) {
-    match result {
-        Ok(n) => {
-            const VARIANT: u32 = 0;
-            memory.store_u32(VARIANT, addr);
-            memory.store_u32(n, addr + 4);
-        }
-        Err(err) => {
-            const VARIANT: u32 = 1;
-            let err = err as u16;
-
-            memory.store_u32(VARIANT, addr);
-            memory.store_u16(err, addr);
-        }
     }
 }
 
