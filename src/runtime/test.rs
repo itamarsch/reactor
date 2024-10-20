@@ -43,6 +43,7 @@ fn test_wat_files() -> io::Result<()> {
             // Run your Rust application with the .wasm file as an argument
             let cargo_status = Command::new("cargo")
                 .arg("run")
+                .arg("--quiet")
                 .arg("--")
                 .arg(&wasm_output)
                 .status()?;
@@ -56,6 +57,8 @@ fn test_wat_files() -> io::Result<()> {
                 "Exit codes differ for {:?}: wasmtime exit code {}, cargo run exit code {}",
                 path, wasmtime_code, cargo_code
             );
+
+            assert_eq!();
         }
     }
 

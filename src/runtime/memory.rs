@@ -84,6 +84,19 @@ impl Memory {
         }
     }
 
+    pub fn grow(&mut self, amount_of_pages: u32) -> i32 {
+        let prev_size = (self.data.len() / PAGE_SIZE) as u32;
+        let new_size = prev_size + amount_of_pages;
+        if self.limits.max.is_some_and(|max| new_size > max) {
+            return -1;
+        }
+
+        self.data
+            .extend(std::iter::repeat(0).take(amount_of_pages as usize * PAGE_SIZE));
+
+        prev_size as i32
+    }
+
     fn apply_memarg(address_raw: u32, memarg: MemoryArgument) -> usize {
         let address_raw: usize = address_raw as usize;
 
@@ -119,6 +132,7 @@ impl Memory {
     define_load_ext_function_unsigned!(load_u64_32, u64, 32);
 
     define_store_function!(store_i32, i32);
+
     pub fn store_u32(&mut self, value: u32, addr: u32) {
         self.store_i32(
             i32::from_le_bytes(value.to_le_bytes()),

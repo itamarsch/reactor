@@ -294,6 +294,13 @@ impl<'a> Runtime<'a> {
             Instruction::I64Store16(memarg) => memory_store!(self, i64, store_i64_16, memarg),
             Instruction::I64Store32(memarg) => memory_store!(self, i64, store_i64_32, memarg),
 
+            Instruction::MemoryGrow => {
+                let delta = self.stack.borrow_mut().pop_u32();
+                self.stack
+                    .borrow_mut()
+                    .push_i32(self.memory.borrow_mut().grow(delta));
+            }
+
             Instruction::I32Const(value) => {
                 self.stack.borrow_mut().push_i32(*value);
             }
