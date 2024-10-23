@@ -23,7 +23,7 @@ mod value;
 
 pub use func::{FuncIdx, FuncType, FuncTypeIdx};
 
-pub use global::{GlobalIdx, GlobalType};
+pub use global::{GlobalIdx, GlobalType, Mutability};
 
 pub use limit::Limit;
 

@@ -18,15 +18,15 @@ use self::{function_state::FunctionState, memory::Memory, stack::Stack};
 use paste::paste;
 
 pub mod function_state;
+mod globals;
 mod locals;
+pub mod memory;
 pub mod stack;
+mod value;
 mod variable;
 
 #[cfg(test)]
 mod test;
-
-pub mod memory;
-mod value;
 
 pub struct Runtime<'a> {
     stack: RefCell<Stack>,
