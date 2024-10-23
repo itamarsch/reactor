@@ -1,4 +1,5 @@
 use std::{
+    borrow::{Borrow, BorrowMut},
     cell::{Cell, RefCell},
     ops::{Deref, DerefMut},
     process::exit,
@@ -38,6 +39,7 @@ pub struct Runtime<'a> {
     module: RefCell<Module<'a>>,
     current_function_state: RefCell<FunctionState>,
     function_depth: Cell<usize>,
+    block_depth: Cell<usize>,
     memory: RefCell<Memory>,
     globals: RefCell<Globals>,
     wasi: RefCell<Wasi>,
@@ -109,6 +111,7 @@ impl<'a> Runtime<'a> {
             start_idx,
         ));
 
+        println!("{:#?}", module.get_function(FuncIdx(18)));
         let runtime = Runtime {
             memory: RefCell::new(Memory::new(module.memory_limit())),
             stack,
@@ -116,6 +119,7 @@ impl<'a> Runtime<'a> {
             module: RefCell::new(module),
             current_function_state: initial_function_state,
             function_depth: Cell::new(0),
+            block_depth: Cell::new(0),
             wasi: RefCell::new(Wasi::new()),
         };
 
@@ -252,7 +256,9 @@ impl<'a> Runtime<'a> {
     fn run_instruction(&self, instruction: &Instruction, current_function: &LocalFunction) {
         match instruction {
             Instruction::Block(block_idx) => self.execute_block(*block_idx),
-            Instruction::Loop(block_idx) => self.execute_block(*block_idx),
+            Instruction::Loop(block_idx) => {
+                self.execute_block(*block_idx);
+            }
             Instruction::If { if_expr, else_expr } => {
                 let condition = self.stack.borrow_mut().pop_bool();
                 if condition {
@@ -262,7 +268,7 @@ impl<'a> Runtime<'a> {
                 }
             }
             Instruction::Break(break_from_idx) => {
-                self.break_from_block(*break_from_idx, current_function)
+                self.break_from_block(*break_from_idx, current_function);
             }
             Instruction::BreakIf(break_from_idx) => {
                 let should_break = self.stack.borrow_mut().pop_bool();
@@ -288,6 +294,16 @@ impl<'a> Runtime<'a> {
             Instruction::Drop => {
                 self.stack.borrow_mut().drop_value();
             }
+            Instruction::Select => {
+                let predicate = self.stack.borrow_mut().pop_bool();
+                let false_value = self.stack.borrow_mut().pop_value();
+                let true_value = self.stack.borrow_mut().pop_value();
+                self.stack.borrow_mut().push_value(if predicate {
+                    true_value
+                } else {
+                    false_value
+                });
+            }
             Instruction::LocalGet(idx) => {
                 let value = self.current_function_state.borrow().get_local_value(*idx);
                 self.stack.borrow_mut().push_value(value);
@@ -297,6 +313,13 @@ impl<'a> Runtime<'a> {
                 self.current_function_state
                     .borrow_mut()
                     .set_local_value(*idx, value);
+            }
+            Instruction::LocalTee(idx) => {
+                let value = self.stack.borrow_mut().pop_value();
+                self.current_function_state
+                    .borrow_mut()
+                    .set_local_value(*idx, value);
+                self.stack.borrow_mut().push_value(value);
             }
 
             Instruction::GlobalGet(idx) => {
@@ -367,16 +390,52 @@ impl<'a> Runtime<'a> {
                     push bool => a != b
                 );
             }
+            Instruction::I32LtU => {
+                numeric_operation!(self,
+                    pops { b: u32, a: u32 },
+                    push bool => a < b
+                );
+            }
             Instruction::I32GtS => {
                 numeric_operation!(self,
                     pops { b: i32, a: i32 },
                     push bool => a > b
                 );
             }
+            Instruction::I32GtU => {
+                numeric_operation!(self,
+                    pops { b: u32, a: u32 },
+                    push bool => a > b
+                );
+            }
+            Instruction::I32LeU => {
+                numeric_operation!(self,
+                    pops { b: u32, a: u32 },
+                    push bool => a <= b
+                );
+            }
             Instruction::I32GeS => {
                 numeric_operation!(self,
                     pops { b: i32, a: i32 },
                     push bool => a >= b
+                );
+            }
+            Instruction::I64Eqz => {
+                numeric_operation!(self,
+                    pops { a: i64 },
+                    push bool => a == 0
+                );
+            }
+            Instruction::I64Eq => {
+                numeric_operation!(self,
+                    pops { b:i64, a: i64 },
+                    push bool => a == b
+                );
+            }
+            Instruction::I64Or => {
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push i64 => a | b
                 );
             }
             Instruction::I32Add => {
@@ -409,10 +468,28 @@ impl<'a> Runtime<'a> {
                     push i32 => a % b
                 );
             }
-            Instruction::I64Eqz => {
+            Instruction::I32And => {
                 numeric_operation!(self,
-                    pops { a: i64 },
-                    push bool => a == 0
+                    pops { b: i32, a: i32 },
+                    push i32 => a & b
+                );
+            }
+            Instruction::I32Or => {
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push i32 => a | b
+                );
+            }
+            Instruction::I32Xor => {
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push i32 => a ^ b
+                );
+            }
+            Instruction::I32ShrU => {
+                numeric_operation!(self,
+                    pops { b: u32, a: u32 },
+                    push u32 => a >> (b % 32)
                 );
             }
             Instruction::I64Add => {
@@ -583,10 +660,7 @@ impl<'a> Runtime<'a> {
                     push f64 => a as f64
                 );
             }
-            _ => panic!(
-                "Instruction: {:?} not implemented {:?}",
-                instruction, self.stack
-            ),
+            _ => panic!("Instruction: {:?} not implemented ", instruction,),
         }
         // println!(
         //     "Executed: {:?}, current state: {:#?}, stack: {:?}\n",
@@ -647,6 +721,11 @@ impl<'a> Runtime<'a> {
 
     fn return_immediate(&self, signature_returns: &[ValueType]) {
         self.return_from_context(signature_returns, || {
+            if !self.current_function_state.borrow().in_block() {
+                self.stack
+                    .borrow_mut()
+                    .push_function_state(self.current_function_state.borrow().clone())
+            }
             self.stack
                 .borrow_mut()
                 .pop_until_function_state(self.current_function_state.borrow().deref())

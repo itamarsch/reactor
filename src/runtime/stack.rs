@@ -136,7 +136,9 @@ impl Stack {
     }
 
     pub fn drop_value(&mut self) {
-        self.stack.pop();
+        let Some(StackValue::Value(_)) = self.stack.pop() else {
+            panic!("Dropped something that isn't value");
+        };
     }
 
     pub fn pop_until_function_state(&mut self, current_function: &FunctionState) -> FunctionState {
