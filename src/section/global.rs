@@ -16,7 +16,7 @@ impl GlobalSection {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GlobalInitializer {
     pub signature: GlobalType,
     pub init: Expr,

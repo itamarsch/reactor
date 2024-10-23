@@ -3,7 +3,7 @@ use nom_leb128::leb128_u32;
 
 use super::ValueType;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct GlobalIdx(pub u32);
 impl GlobalIdx {
     pub fn parse(input: &[u8]) -> IResult<&[u8], GlobalIdx> {
@@ -11,7 +11,7 @@ impl GlobalIdx {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct GlobalType {
     pub valtype: ValueType,
     pub mutability: Mutability,
@@ -31,7 +31,7 @@ impl GlobalType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Mutability {
     Mutable,
     Const,

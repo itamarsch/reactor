@@ -1,13 +1,14 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-    section::{Section, SectionType},
+    section::{global::GlobalInitializer, Section, SectionType},
     types::{Data, Expr, FuncIdx, FuncType, FunctionCode, Limit, LocalTypes},
 };
 
 use self::{
     data::take_datas,
     functions::{take_functions, Function, LocalFunction},
+    globals::take_globals,
     memory::take_memory_declaration,
     start::get_starting_function_index,
 };
@@ -22,6 +23,7 @@ mod start;
 pub struct Module<'a> {
     functions: Vec<Function<'a>>,
     datas: Vec<Data>,
+    globals: Vec<GlobalInitializer>,
     start: FuncIdx,
     memory: Limit,
 }
@@ -33,7 +35,9 @@ impl<'t> Module<'t> {
             .expect("Wasi module expected to export a function _start");
         let memory = take_memory_declaration(&mut sections);
         let datas = take_datas(&mut sections);
+        let globals = take_globals(&mut sections);
         Self {
+            globals,
             datas,
             functions,
             start: starting_point,
@@ -59,6 +63,10 @@ impl<'t> Module<'t> {
 
     pub fn datas(&self) -> &[Data] {
         &self.datas
+    }
+
+    pub fn global_initializers(&self) -> &[GlobalInitializer] {
+        &self.globals
     }
 
     pub fn add_expr(&mut self, expr: Expr) -> FuncIdx {

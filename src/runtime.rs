@@ -14,7 +14,12 @@ use crate::{
     wasi::Wasi,
 };
 
-use self::{function_state::FunctionState, memory::Memory, stack::Stack};
+use self::{
+    function_state::FunctionState,
+    globals::{Global, Globals},
+    memory::Memory,
+    stack::Stack,
+};
 use paste::paste;
 
 pub mod function_state;
@@ -34,6 +39,7 @@ pub struct Runtime<'a> {
     current_function_state: RefCell<FunctionState>,
     function_depth: Cell<usize>,
     memory: RefCell<Memory>,
+    globals: RefCell<Globals>,
     wasi: RefCell<Wasi>,
 }
 
@@ -106,12 +112,14 @@ impl<'a> Runtime<'a> {
         let runtime = Runtime {
             memory: RefCell::new(Memory::new(module.memory_limit())),
             stack,
+            globals: RefCell::new(Globals::new()),
             module: RefCell::new(module),
             current_function_state: initial_function_state,
             function_depth: Cell::new(0),
             wasi: RefCell::new(Wasi::new()),
         };
 
+        runtime.initialize_globals();
         runtime.run_datas();
 
         runtime
@@ -146,6 +154,28 @@ impl<'a> Runtime<'a> {
         self.module.borrow_mut().remove_expr(idx);
 
         result
+    }
+
+    fn initialize_globals(&self) {
+        let borrow = self.module.borrow();
+
+        let initializers = borrow.global_initializers();
+        let initializers = initializers.to_vec();
+        drop(borrow);
+
+        let globals = initializers
+            .iter()
+            .map(|global| {
+                let value = self.run_expr(global.init.clone(), || {
+                    self.stack
+                        .borrow_mut()
+                        .pop_value_by_type(global.signature.valtype)
+                });
+                Global::new(value, global.signature.mutability)
+            })
+            .collect::<Vec<_>>();
+
+        self.globals.borrow_mut().fill(globals);
     }
 
     fn run_datas(&self) {
@@ -267,6 +297,15 @@ impl<'a> Runtime<'a> {
                 self.current_function_state
                     .borrow_mut()
                     .set_local_value(*idx, value);
+            }
+
+            Instruction::GlobalGet(idx) => {
+                let value = self.globals.borrow().get(*idx);
+                self.stack.borrow_mut().push_value(value);
+            }
+            Instruction::GlobalSet(idx) => {
+                let value = self.stack.borrow_mut().pop_value();
+                self.globals.borrow_mut().set(value, *idx);
             }
 
             Instruction::I32Load(memarg) => memory_load!(self, i32, load_i32, memarg),
@@ -406,6 +445,12 @@ impl<'a> Runtime<'a> {
                     push i64 => a % b
                 );
             }
+            Instruction::I64RemU => {
+                numeric_operation!(self,
+                    pops { b: u64, a: u64 },
+                    push u64 => a % b
+                );
+            }
             Instruction::I64ShrS => {
                 numeric_operation!(self,
                     pops { b: i64, a: i64 },
@@ -496,16 +541,34 @@ impl<'a> Runtime<'a> {
                     push i64 => a as i64
                 );
             }
+            Instruction::I64ExtendI32U => {
+                numeric_operation!(self,
+                    pops { a: u32 },
+                    push u64 => a as u64
+                );
+            }
             Instruction::I64TruncF32S => {
                 numeric_operation!(self,
                     pops { a: f32 },
                     push i64 => a as i64
                 );
             }
+            Instruction::I64TruncF32U => {
+                numeric_operation!(self,
+                    pops { a: f32 },
+                    push u64 => a as u64
+                );
+            }
             Instruction::I64TruncF64S => {
                 numeric_operation!(self,
                     pops { a: f64 },
                     push i64 => a as i64
+                );
+            }
+            Instruction::I64TruncF64U => {
+                numeric_operation!(self,
+                    pops { a: f64 },
+                    push u64 => a as u64
                 );
             }
             Instruction::F32ConvertI32S => {

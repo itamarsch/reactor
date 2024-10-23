@@ -34,6 +34,10 @@ impl Variable {
         }
     }
 
+    pub fn from_value(value: Value) -> Variable {
+        Variable { value }
+    }
+
     pub fn from_i32(value: i32) -> Variable {
         Variable {
             value: Value::I32(value),
