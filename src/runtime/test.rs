@@ -37,20 +37,20 @@ fn test_wat_files() -> io::Result<()> {
                 status.code()
             );
 
-            // Run the compiled .wasm file with wasmtime
-            let wasmtime_status = Command::new("wasmtime").arg(&wasm_output).status()?;
+            // Run the compiled .wasm file with wasmtime, capturing stdout
+            let wasmtime_output = Command::new("wasmtime").arg(&wasm_output).output()?; // Captures stdout, stderr, and exit status
 
-            // Run your Rust application with the .wasm file as an argument
-            let cargo_status = Command::new("cargo")
+            // Run your Rust application with the .wasm file as an argument, capturing stdout
+            let cargo_output = Command::new("cargo")
                 .arg("run")
                 .arg("--quiet")
                 .arg("--")
                 .arg(&wasm_output)
-                .status()?;
+                .output()?; // Captures stdout, stderr, and exit status
 
             // Capture and compare the exit codes
-            let wasmtime_code = wasmtime_status.code().unwrap_or(-1);
-            let cargo_code = cargo_status.code().unwrap_or(-1);
+            let wasmtime_code = wasmtime_output.status.code().unwrap_or(-1);
+            let cargo_code = cargo_output.status.code().unwrap_or(-1);
 
             assert_eq!(
                 wasmtime_code, cargo_code,
@@ -58,7 +58,15 @@ fn test_wat_files() -> io::Result<()> {
                 path, wasmtime_code, cargo_code
             );
 
-            assert_eq!();
+            // Capture and compare the standard outputs
+            let wasmtime_stdout = String::from_utf8_lossy(&wasmtime_output.stdout);
+            let cargo_stdout = String::from_utf8_lossy(&cargo_output.stdout);
+
+            assert_eq!(
+                wasmtime_stdout, cargo_stdout,
+                "Standard output differs for {:?}:\nwasmtime stdout:\n{}\ncargo run stdout:\n{}",
+                path, wasmtime_stdout, cargo_stdout
+            );
         }
     }
 

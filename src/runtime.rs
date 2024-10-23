@@ -18,9 +18,9 @@ use self::{function_state::FunctionState, memory::Memory, stack::Stack};
 use paste::paste;
 
 pub mod function_state;
-mod local;
 mod locals;
 pub mod stack;
+mod variable;
 
 #[cfg(test)]
 mod test;

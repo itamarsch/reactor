@@ -1,11 +1,11 @@
 use super::value::Value;
 
 #[derive(Debug)]
-pub struct Local {
+pub struct Variable {
     value: Value,
 }
 
-impl Local {
+impl Variable {
     pub fn value(&self) -> Value {
         self.value
     }
@@ -34,47 +34,47 @@ impl Local {
         }
     }
 
-    pub fn from_i32(value: i32) -> Local {
-        Local {
+    pub fn from_i32(value: i32) -> Variable {
+        Variable {
             value: Value::I32(value),
         }
     }
 
-    pub fn from_i64(value: i64) -> Local {
-        Local {
+    pub fn from_i64(value: i64) -> Variable {
+        Variable {
             value: Value::I64(value),
         }
     }
 
-    pub fn from_f32(value: f32) -> Local {
-        Local {
+    pub fn from_f32(value: f32) -> Variable {
+        Variable {
             value: Value::F32(value),
         }
     }
 
-    pub fn from_f64(value: f64) -> Local {
-        Local {
+    pub fn from_f64(value: f64) -> Variable {
+        Variable {
             value: Value::F64(value),
         }
     }
 
-    pub fn from_i32_default() -> Local {
-        Local {
+    pub fn from_i32_default() -> Variable {
+        Variable {
             value: Value::I32(0),
         }
     }
-    pub fn from_i64_default() -> Local {
-        Local {
+    pub fn from_i64_default() -> Variable {
+        Variable {
             value: Value::I64(0),
         }
     }
-    pub fn from_f32_default() -> Local {
-        Local {
+    pub fn from_f32_default() -> Variable {
+        Variable {
             value: Value::F32(0.0),
         }
     }
-    pub fn from_f64_default() -> Local {
-        Local {
+    pub fn from_f64_default() -> Variable {
+        Variable {
             value: Value::F64(0.0),
         }
     }

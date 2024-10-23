@@ -1,19 +1,19 @@
 use crate::types::{LocalIdx, LocalTypes, NumericValueType, ValueType};
 
-use super::{local::Local, stack::Stack, value::Value};
+use super::{stack::Stack, value::Value, variable::Variable};
 
-fn local_types_to_defaults(local_types: &LocalTypes) -> impl Iterator<Item = Local> + '_ {
+fn local_types_to_defaults(local_types: &LocalTypes) -> impl Iterator<Item = Variable> + '_ {
     local_types.0.iter().map(|e| match e {
-        ValueType::Numeric(NumericValueType::I32) => Local::from_i32_default(),
-        ValueType::Numeric(NumericValueType::I64) => Local::from_i64_default(),
-        ValueType::Numeric(NumericValueType::F32) => Local::from_f32_default(),
-        ValueType::Numeric(NumericValueType::F64) => Local::from_f64_default(),
+        ValueType::Numeric(NumericValueType::I32) => Variable::from_i32_default(),
+        ValueType::Numeric(NumericValueType::I64) => Variable::from_i64_default(),
+        ValueType::Numeric(NumericValueType::F32) => Variable::from_f32_default(),
+        ValueType::Numeric(NumericValueType::F64) => Variable::from_f64_default(),
         ValueType::Ref(_) => todo!(),
     })
 }
 
 #[derive(Debug)]
-pub struct Locals(Vec<Local>);
+pub struct Locals(Vec<Variable>);
 
 impl Locals {
     pub fn set_value(&mut self, LocalIdx(idx): LocalIdx, value: Value) {
@@ -43,10 +43,10 @@ impl Locals {
             .iter()
             .rev()
             .map(|e| match e {
-                ValueType::Numeric(NumericValueType::I32) => Local::from_i32(stack.pop_i32()),
-                ValueType::Numeric(NumericValueType::I64) => Local::from_i64(stack.pop_i64()),
-                ValueType::Numeric(NumericValueType::F32) => Local::from_f32(stack.pop_f32()),
-                ValueType::Numeric(NumericValueType::F64) => Local::from_f64(stack.pop_f64()),
+                ValueType::Numeric(NumericValueType::I32) => Variable::from_i32(stack.pop_i32()),
+                ValueType::Numeric(NumericValueType::I64) => Variable::from_i64(stack.pop_i64()),
+                ValueType::Numeric(NumericValueType::F32) => Variable::from_f32(stack.pop_f32()),
+                ValueType::Numeric(NumericValueType::F64) => Variable::from_f64(stack.pop_f64()),
                 ValueType::Ref(_) => todo!(),
             })
             .collect::<Vec<_>>();
