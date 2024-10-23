@@ -14,6 +14,7 @@ use self::{
 
 mod data;
 pub mod functions;
+mod globals;
 mod memory;
 mod start;
 
