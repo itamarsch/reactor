@@ -6,6 +6,7 @@
 
   ;; Declare a memory with an initial size of 1 page (64KiB).
   (memory 1)
+  (export "memory" (memory 0))
 
   ;; Function to grow memory and return the previous size.
   (func $grow_memory (param $pages_to_grow i32) (result i32)
