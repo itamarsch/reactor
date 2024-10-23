@@ -103,7 +103,7 @@ impl Memory {
         address_raw + memarg.offset as usize
     }
 
-    pub fn fill_data(&mut self, address: i32, data: &[u8]) {
+    pub fn fill_data(&mut self, address: u32, data: &[u8]) {
         let address = address as usize;
         self.data[address..address + data.len()].copy_from_slice(data);
     }

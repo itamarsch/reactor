@@ -125,7 +125,7 @@ impl<'a> Runtime<'a> {
         );
     }
 
-    pub fn run_expr(&self, expr: Expr) {
+    pub fn run_expr<T>(&self, expr: Expr, mut get_result_after_expr: impl FnMut() -> T) -> T {
         let idx = self.module.borrow_mut().add_expr(expr);
 
         // Swaped in next line
@@ -136,11 +136,16 @@ impl<'a> Runtime<'a> {
         );
         self.execute();
 
+        let result = get_result_after_expr();
+
+        assert!(self.stack.borrow().is_empty(), "Stack is empty");
         std::mem::swap(
             &mut function_state_before_expr,
             self.current_function_state.borrow_mut().deref_mut(),
         );
         self.module.borrow_mut().remove_expr(idx);
+
+        result
     }
 
     fn run_datas(&self) {
@@ -154,12 +159,10 @@ impl<'a> Runtime<'a> {
             }
         }
         for (offset_instructions, data_index) in offset_calulations_to_run {
-            self.run_expr(offset_instructions);
-            let offset = self.stack.borrow_mut().pop_i32();
+            let offset = self.run_expr(offset_instructions, || self.stack.borrow_mut().pop_u32());
             self.memory
                 .borrow_mut()
                 .fill_data(offset, &self.module.borrow().datas()[data_index].init);
-            assert!(self.stack.borrow().is_empty(), "Stack is empty");
         }
     }
 
