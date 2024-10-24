@@ -5,7 +5,7 @@
 
 ## What is Reactor?
 
-Reactor is a custom WebAssembly interpreter focused on simplicity and educational exploration. It’s an ongoing project aimed at gaining hands-on experience with the core concepts of WebAssembly runtimes, without diving into advanced features like JIT or WASI. It’s the perfect environment for anyone who wants to experiment and learn about how WASM operates under the hood.
+Reactor is a custom WebAssembly interpreter focused on simplicity and educational exploration. It’s an ongoing project aimed at gaining hands-on experience with the core concepts of WebAssembly runtimes, without diving into advanced features like JIT. It’s the perfect environment for anyone who wants to experiment and learn about how WASM and WASI operate under the hood.
 
 ## Goals
 
