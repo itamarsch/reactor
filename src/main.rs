@@ -1,4 +1,4 @@
-use wasmy::{module::Module, runtime::Runtime};
+use reactor::{module::Module, runtime::Runtime};
 
 fn main() {
     let file = std::env::args().nth(1).unwrap();
