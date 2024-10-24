@@ -1,7 +1,8 @@
-use std::{collections::HashMap, rc::Rc};
+use std::rc::Rc;
 
 use crate::{
-    section::{global::GlobalInitializer, r#type::TypeSection, Section, SectionType},
+    parse_sections,
+    section::{global::GlobalInitializer, r#type::TypeSection},
     types::{
         Data, Element, Expr, FuncIdx, FuncType, FuncTypeIdx, FunctionCode, Limit, LocalTypes,
         TableType,
@@ -40,7 +41,9 @@ pub struct Module<'a> {
 }
 
 impl<'t> Module<'t> {
-    pub fn new(mut sections: HashMap<SectionType<'t>, Section<'t>>) -> Self {
+    pub fn new(input: &'t [u8]) -> Self {
+        let (_, mut sections) = parse_sections(input).unwrap();
+
         let (functions, function_types) = take_functions(&mut sections);
         let starting_point = get_starting_function_index(&mut sections)
             .expect("Wasi module expected to export a function _start");
