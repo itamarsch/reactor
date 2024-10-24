@@ -55,10 +55,11 @@ macro_rules! numeric_operation {
     ) => {
         {
             paste! {
+                let mut stack_borrow = $self.stack.borrow_mut();
                 $(
-                    let $ident = $self.stack.borrow_mut().[<pop_ $type>]();
+                    let $ident = stack_borrow.[<pop_ $type>]();
                 )*
-                $self.stack.borrow_mut().[<push_ $result_type>]($expr);
+                stack_borrow.[<push_ $result_type>]($expr);
             }
         }
     };
@@ -361,16 +362,15 @@ impl<'a> Runtime<'a> {
                 )
             };
 
+            let current_function_state_borrow = self.current_function_state.borrow();
             if current_function
                 .code
                 .instructions
-                .done(self.current_function_state.borrow().instruction_index())
+                .done(current_function_state_borrow.instruction_index())
             {
-                if self.function_depth.get() > 0 || self.current_function_state.borrow().in_block()
-                {
-                    let borrow = self.current_function_state.borrow();
-                    let index = borrow.instruction_index();
-                    drop(borrow);
+                if self.function_depth.get() > 0 || current_function_state_borrow.in_block() {
+                    let index = current_function_state_borrow.instruction_index();
+                    drop(current_function_state_borrow);
 
                     match index {
                         function_state::InstructionIndex::IndexInFunction(_) => {
@@ -393,7 +393,8 @@ impl<'a> Runtime<'a> {
             let instruction = &current_function
                 .code
                 .instructions
-                .get_instruction(self.current_function_state.borrow().instruction_index());
+                .get_instruction(current_function_state_borrow.instruction_index());
+            drop(current_function_state_borrow);
 
             self.current_function_state.borrow_mut().next_instruction();
 

@@ -16,7 +16,8 @@ fn test_wat_files() -> io::Result<()> {
         let path = entry.path();
 
         // Check if the file has a .wat extension
-        if path.extension().and_then(|s| s.to_str()) == Some("wat") {
+        let extension = path.extension().and_then(|s| s.to_str());
+        if let Some(extension @ ("wasm" | "rs")) = extension {
             // Get the filename without extension
             let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap();
 
@@ -24,11 +25,24 @@ fn test_wat_files() -> io::Result<()> {
             let wasm_output = format!("{}/{}.wasm", out_dir, file_stem);
 
             // Compile the .wat file to .wasm using wat2wasm
-            let status = Command::new("wat2wasm")
-                .arg(&path)
-                .arg("-o")
-                .arg(&wasm_output)
-                .status()?;
+
+            let status = if extension == "wasm" {
+                Command::new("wat2wasm")
+                    .arg(&path)
+                    .arg("-o")
+                    .arg(&wasm_output)
+                    .status()?
+            } else if extension == "rs" {
+                Command::new("rustc")
+                    .arg("--target=wasm32-wasi")
+                    .arg("-O")
+                    .arg(&path)
+                    .arg("-o")
+                    .arg(&wasm_output)
+                    .status()?
+            } else {
+                unreachable!()
+            };
 
             assert!(
                 status.success(),
@@ -44,6 +58,7 @@ fn test_wat_files() -> io::Result<()> {
             let cargo_output = Command::new("cargo")
                 .arg("run")
                 .arg("--quiet")
+                .arg("--release")
                 .arg("--")
                 .arg(&wasm_output)
                 .output()?; // Captures stdout, stderr, and exit status
