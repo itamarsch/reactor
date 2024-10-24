@@ -262,6 +262,8 @@ impl<'a> Runtime<'a> {
             Function::Imported(function) => {
                 if function.mod_name == "wasi_snapshot_preview1" {
                     self.wasi_function(function.name);
+                } else {
+                    panic!("Unkown module import: {:?}", function.mod_name);
                 }
             }
         }
