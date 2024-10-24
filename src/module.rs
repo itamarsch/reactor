@@ -3,12 +3,14 @@ use std::{collections::HashMap, rc::Rc};
 use crate::{
     section::{global::GlobalInitializer, r#type::TypeSection, Section, SectionType},
     types::{
-        Data, Expr, FuncIdx, FuncType, FuncTypeIdx, FunctionCode, Limit, LocalTypes, TableType,
+        Data, Element, Expr, FuncIdx, FuncType, FuncTypeIdx, FunctionCode, Limit, LocalTypes,
+        TableType,
     },
 };
 
 use self::{
     data::take_datas,
+    elements::take_element_declarations,
     functions::{take_functions, Function, LocalFunction},
     globals::take_globals,
     memory::take_memory_declaration,
@@ -17,6 +19,7 @@ use self::{
 };
 
 mod data;
+mod elements;
 pub mod functions;
 mod globals;
 mod memory;
@@ -27,8 +30,10 @@ mod tables;
 pub struct Module<'a> {
     functions: Vec<Function<'a>>,
     function_types: TypeSection,
+    elements: Option<Vec<Element>>,
     datas: Vec<Data>,
     globals: Vec<GlobalInitializer>,
+
     tables: Vec<TableType>,
     start: FuncIdx,
     memory: Limit,
@@ -43,7 +48,10 @@ impl<'t> Module<'t> {
         let datas = take_datas(&mut sections);
         let globals = take_globals(&mut sections);
         let tables = take_table_declarations(&mut sections);
+        let elements = take_element_declarations(&mut sections);
+
         Self {
+            elements: Some(elements),
             globals,
             datas,
             functions,
@@ -51,6 +59,15 @@ impl<'t> Module<'t> {
             tables,
             start: starting_point,
             memory,
+        }
+    }
+
+    pub fn elements(&mut self) -> Vec<Element> {
+        let elements = self.elements.take();
+        if let Some(elements) = elements {
+            elements
+        } else {
+            panic!("Cannot take elements twice");
         }
     }
 

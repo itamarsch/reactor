@@ -42,4 +42,8 @@ impl Table {
     pub fn set(&mut self, TableElementIdx(idx): TableElementIdx, element: Ref) {
         self.refs[idx] = element
     }
+
+    pub fn fill(&mut self, TableElementIdx(idx): TableElementIdx, elements: &[Ref]) {
+        self.refs[idx..idx + elements.len()].copy_from_slice(elements)
+    }
 }

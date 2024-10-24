@@ -1,5 +1,4 @@
 use std::{
-    borrow::{Borrow, BorrowMut},
     cell::{Cell, RefCell},
     ops::{Deref, DerefMut},
     process::exit,
@@ -10,7 +9,7 @@ use crate::{
         functions::{Function, LocalFunction},
         Module,
     },
-    types::{BlockIdx, Expr, FuncIdx, Instruction, ValueType},
+    types::{BlockIdx, ElementMode, Expr, FuncIdx, Instruction, ValueType},
     wasi::Wasi,
 };
 
@@ -20,7 +19,7 @@ use self::{
     locals::Locals,
     memory::Memory,
     stack::Stack,
-    table::Tables,
+    table::{TableElementIdx, Tables},
     value::Value,
 };
 use paste::paste;
@@ -129,6 +128,7 @@ impl<'a> Runtime<'a> {
             function_depth: Cell::new(0),
         };
 
+        runtime.initilize_elements();
         runtime.initialize_globals();
         runtime.run_datas();
 
@@ -164,6 +164,36 @@ impl<'a> Runtime<'a> {
         self.module.borrow_mut().remove_expr(idx);
 
         result
+    }
+
+    fn initilize_elements(&self) {
+        let mut module_borrow = self.module.borrow_mut();
+        let elements = module_borrow.elements();
+        drop(module_borrow);
+
+        for element in elements {
+            match element.mode {
+                ElementMode::Declarative => {}
+                ElementMode::Passive => {
+                    todo!()
+                }
+                ElementMode::Active {
+                    table,
+                    offset_in_table,
+                } => {
+                    let offset = self.run_expr(offset_in_table, || {
+                        TableElementIdx(self.stack.borrow_mut().pop_u32() as usize)
+                    });
+                    let refs = element
+                        .init
+                        .into_iter()
+                        .map(|init| self.run_expr(init, || self.stack.borrow_mut().pop_ref()))
+                        .collect::<Vec<_>>();
+
+                    self.tables.borrow_mut().table(table).fill(offset, &refs);
+                }
+            }
+        }
     }
 
     fn initialize_globals(&self) {
@@ -414,6 +444,12 @@ impl<'a> Runtime<'a> {
             Instruction::F64Const(value) => {
                 self.stack.borrow_mut().push_f64(*value);
             }
+            Instruction::I32Eq => {
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push bool => a == b
+                );
+            }
             Instruction::I32Eqz => {
                 numeric_operation!(self,
                     pops { a: i32, },
@@ -424,6 +460,12 @@ impl<'a> Runtime<'a> {
                 numeric_operation!(self,
                     pops { b: i32, a: i32 },
                     push bool => a != b
+                );
+            }
+            Instruction::I32LtS => {
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push bool => a < b
                 );
             }
             Instruction::I32LtU => {
@@ -456,6 +498,12 @@ impl<'a> Runtime<'a> {
                     push bool => a >= b
                 );
             }
+            Instruction::I32GeU => {
+                numeric_operation!(self,
+                    pops { b: u32, a: u32 },
+                    push bool => a >= b
+                );
+            }
             Instruction::I64Eqz => {
                 numeric_operation!(self,
                     pops { a: i64 },
@@ -466,6 +514,12 @@ impl<'a> Runtime<'a> {
                 numeric_operation!(self,
                     pops { b:i64, a: i64 },
                     push bool => a == b
+                );
+            }
+            Instruction::I64GeU => {
+                numeric_operation!(self,
+                    pops { b: u64, a: u64 },
+                    push bool => a >= b
                 );
             }
             Instruction::I64Or => {
@@ -520,6 +574,18 @@ impl<'a> Runtime<'a> {
                 numeric_operation!(self,
                     pops { b: i32, a: i32 },
                     push i32 => a ^ b
+                );
+            }
+            Instruction::I32Shl => {
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push i32 => a << (b % 32)
+                );
+            }
+            Instruction::I32ShrS => {
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push i32 => a >> (b % 32)
                 );
             }
             Instruction::I32ShrU => {
@@ -767,7 +833,8 @@ impl<'a> Runtime<'a> {
             self.stack
                 .borrow_mut()
                 .pop_until_function_state(self.current_function_state.borrow().deref())
-        })
+        });
+        self.function_depth.set(self.function_depth.get() - 1);
     }
 
     pub fn execute(&self) {
