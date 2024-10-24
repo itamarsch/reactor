@@ -10,7 +10,6 @@ use crate::{
         functions::{Function, LocalFunction},
         Module,
     },
-    runtime::{locals::Locals, value::Value},
     types::{BlockIdx, Expr, FuncIdx, Instruction, ValueType},
     wasi::Wasi,
 };
@@ -18,8 +17,11 @@ use crate::{
 use self::{
     function_state::FunctionState,
     globals::{Global, Globals},
+    locals::Locals,
     memory::Memory,
     stack::Stack,
+    table::Tables,
+    value::Value,
 };
 use paste::paste;
 
@@ -28,6 +30,7 @@ mod globals;
 mod locals;
 pub mod memory;
 pub mod stack;
+mod table;
 mod value;
 mod variable;
 
@@ -39,10 +42,10 @@ pub struct Runtime<'a> {
     module: RefCell<Module<'a>>,
     current_function_state: RefCell<FunctionState>,
     function_depth: Cell<usize>,
-    block_depth: Cell<usize>,
     memory: RefCell<Memory>,
     globals: RefCell<Globals>,
     wasi: RefCell<Wasi>,
+    tables: RefCell<Tables>,
 }
 
 macro_rules! numeric_operation {
@@ -100,27 +103,30 @@ impl<'a> Runtime<'a> {
         let (start_idx, Function::Local(starting_function)) = module.get_starting_function() else {
             panic!("Cannot start from imported function")
         };
+
         assert!(
             starting_function.signature.params.is_empty(),
             "_start function cannot take arguments"
         );
 
-        let stack = RefCell::new(Stack::new());
-        let initial_function_state = RefCell::new(FunctionState::new_function(
+        let stack = Stack::new();
+
+        let initial_function_state = FunctionState::new_function(
             Locals::new_no_function_parameters(&starting_function.code.locals),
             start_idx,
-        ));
+        );
 
-        println!("{:#?}", module.get_function(FuncIdx(18)));
+        let tables = Tables::new(module.tables());
+
         let runtime = Runtime {
             memory: RefCell::new(Memory::new(module.memory_limit())),
-            stack,
+            stack: RefCell::new(stack),
             globals: RefCell::new(Globals::new()),
+            tables: RefCell::new(tables),
             module: RefCell::new(module),
-            current_function_state: initial_function_state,
-            function_depth: Cell::new(0),
-            block_depth: Cell::new(0),
+            current_function_state: RefCell::new(initial_function_state),
             wasi: RefCell::new(Wasi::new()),
+            function_depth: Cell::new(0),
         };
 
         runtime.initialize_globals();
@@ -291,6 +297,27 @@ impl<'a> Runtime<'a> {
             Instruction::Call(func_idx) => {
                 self.call_function(*func_idx);
             }
+            Instruction::CallIndirect(type_idx, table_idx) => {
+                let mut tables_borrow = self.tables.borrow_mut();
+                let table = tables_borrow.table(*table_idx);
+                let table_element_idx = self.stack.borrow_mut().pop_table_element_idx();
+                let Some(func_idx) = table.get(table_element_idx) else {
+                    panic!("Issued call_indirect on a null reference.")
+                };
+
+                let module_borrow = self.module.borrow();
+                let Some(func) = module_borrow.get_function(func_idx) else {
+                    panic!("Function index in table isn't a valid function index");
+                };
+                let Some(signature) = module_borrow.function_signature(*type_idx) else {
+                    panic!("call_indirect has invalid type index");
+                };
+                if func.signature().deref() != signature.deref() {
+                    panic!("call_indirect signature doesn't fit actual function signature");
+                }
+
+                self.call_function(func_idx);
+            }
             Instruction::Drop => {
                 self.stack.borrow_mut().drop_value();
             }
@@ -329,6 +356,15 @@ impl<'a> Runtime<'a> {
             Instruction::GlobalSet(idx) => {
                 let value = self.stack.borrow_mut().pop_value();
                 self.globals.borrow_mut().set(value, *idx);
+            }
+
+            Instruction::TableSet(table_idx) => {
+                let ref_value = self.stack.borrow_mut().pop_ref();
+                let index_in_table = self.stack.borrow_mut().pop_table_element_idx();
+                self.tables
+                    .borrow_mut()
+                    .table(*table_idx)
+                    .set(index_in_table, ref_value);
             }
 
             Instruction::I32Load(memarg) => memory_load!(self, i32, load_i32, memarg),
@@ -660,6 +696,8 @@ impl<'a> Runtime<'a> {
                     push f64 => a as f64
                 );
             }
+
+            Instruction::PushFuncRef(func) => self.stack.borrow_mut().push_ref(Some(*func)),
             _ => panic!("Instruction: {:?} not implemented ", instruction,),
         }
         // println!(

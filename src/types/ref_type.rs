@@ -1,9 +1,8 @@
 use nom::{number::complete::u8, IResult};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RefType {
     FuncRef,
-    ExternRef,
 }
 
 impl RefType {
@@ -20,7 +19,7 @@ impl TryFrom<u8> for RefType {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         Ok(match value {
             0x70 => RefType::FuncRef,
-            0x6F => RefType::ExternRef,
+            0x6F => panic!("Externref not supported yet"),
             _ => return Err(()),
         })
     }

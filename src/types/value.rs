@@ -2,14 +2,14 @@ use nom::{number::complete::u8, IResult};
 
 use super::RefType;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueType {
     Numeric(NumericValueType),
     // Vector(VectorType),
     Ref(RefType),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NumericValueType {
     I32 = 0x7F,
     I64 = 0x7E,

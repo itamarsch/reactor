@@ -1,7 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-    section::{import::ImportSection, Section, SectionType},
+    section::{import::ImportSection, r#type::TypeSection, Section, SectionType},
     types::{FuncIdx, FuncType, FunctionCode, ImportDesc},
 };
 
@@ -24,9 +24,18 @@ pub enum Function<'a> {
     Imported(ImportedFunction<'a>),
 }
 
+impl Function<'_> {
+    pub fn signature(&self) -> Rc<FuncType> {
+        match self {
+            Function::Local(l) => l.signature.clone(),
+            Function::Imported(i) => i.signature.clone(),
+        }
+    }
+}
+
 pub fn take_functions<'a>(
     sections: &mut HashMap<SectionType<'a>, Section<'a>>,
-) -> Vec<Function<'a>> {
+) -> (Vec<Function<'a>>, TypeSection) {
     let type_section = sections.remove(&SectionType::Type);
 
     let function_section = sections.remove(&SectionType::Function);
@@ -34,7 +43,7 @@ pub fn take_functions<'a>(
     let code_section = sections.remove(&SectionType::Code);
 
     if type_section.is_none() && function_section.is_none() && code_section.is_none() {
-        return vec![];
+        return (vec![], TypeSection::empty());
     }
 
     if let (
@@ -88,7 +97,7 @@ pub fn take_functions<'a>(
             .collect::<Vec<_>>();
 
         imported_functions.extend(functions);
-        imported_functions
+        (imported_functions, type_section)
     } else {
         panic!("Invalid function sections some missing")
     }

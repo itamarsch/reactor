@@ -4,7 +4,8 @@ use crate::types::{BlockIdx, NumericValueType, ValueType};
 
 use super::{
     function_state::{FunctionState, InstructionIndex},
-    value::Value,
+    table::TableElementIdx,
+    value::{Ref, Value},
 };
 
 #[derive(Debug)]
@@ -50,6 +51,10 @@ impl Stack {
         self.stack.push(StackValue::Value(Value::F64(value)))
     }
 
+    pub fn push_ref(&mut self, value: Ref) {
+        self.stack.push(StackValue::Value(Value::Ref(value)))
+    }
+
     pub fn pop_bool(&mut self) -> bool {
         let value = self.pop_i32();
         value != 0
@@ -61,6 +66,10 @@ impl Stack {
         } else {
             panic!("Tried popping i32 from stack but failed")
         }
+    }
+
+    pub fn pop_table_element_idx(&mut self) -> TableElementIdx {
+        TableElementIdx(self.pop_u32() as usize)
     }
 
     pub fn pop_u32(&mut self) -> u32 {
@@ -95,9 +104,18 @@ impl Stack {
         }
     }
 
+    pub fn pop_ref(&mut self) -> Ref {
+        if let Some(StackValue::Value(Value::Ref(value))) = self.stack.pop() {
+            value
+        } else {
+            panic!("Tried popping i32 from stack but failed")
+        }
+    }
+
     pub fn push_value(&mut self, value: Value) {
         self.stack.push(StackValue::Value(value));
     }
+
     pub fn pop_value(&mut self) -> Value {
         if let Some(StackValue::Value(value)) = self.stack.pop() {
             value
@@ -105,6 +123,7 @@ impl Stack {
             panic!("Tried popping value from stack but failed")
         }
     }
+
     pub fn pop_value_by_type(&mut self, value_type: ValueType) -> Value {
         let poped_value = self.stack.pop();
         if let Some(StackValue::Value(value)) = poped_value {

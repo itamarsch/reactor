@@ -3,7 +3,7 @@ use nom_leb128::leb128_u32;
 
 use super::{Limit, RefType};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct TableIdx(pub u32);
 impl TableIdx {
     pub fn parse(input: &[u8]) -> IResult<&[u8], TableIdx> {

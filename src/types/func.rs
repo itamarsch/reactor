@@ -22,7 +22,7 @@ impl FuncIdx {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FuncType {
     pub params: Vec<ValueType>,
     pub returns: Vec<ValueType>,

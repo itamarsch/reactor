@@ -1,8 +1,10 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-    section::{global::GlobalInitializer, Section, SectionType},
-    types::{Data, Expr, FuncIdx, FuncType, FunctionCode, Limit, LocalTypes},
+    section::{global::GlobalInitializer, r#type::TypeSection, Section, SectionType},
+    types::{
+        Data, Expr, FuncIdx, FuncType, FuncTypeIdx, FunctionCode, Limit, LocalTypes, TableType,
+    },
 };
 
 use self::{
@@ -11,6 +13,7 @@ use self::{
     globals::take_globals,
     memory::take_memory_declaration,
     start::get_starting_function_index,
+    tables::take_table_declarations,
 };
 
 mod data;
@@ -18,31 +21,45 @@ pub mod functions;
 mod globals;
 mod memory;
 mod start;
+mod tables;
 
 #[derive(Debug)]
 pub struct Module<'a> {
     functions: Vec<Function<'a>>,
+    function_types: TypeSection,
     datas: Vec<Data>,
     globals: Vec<GlobalInitializer>,
+    tables: Vec<TableType>,
     start: FuncIdx,
     memory: Limit,
 }
 
 impl<'t> Module<'t> {
     pub fn new(mut sections: HashMap<SectionType<'t>, Section<'t>>) -> Self {
-        let functions = take_functions(&mut sections);
+        let (functions, function_types) = take_functions(&mut sections);
         let starting_point = get_starting_function_index(&mut sections)
             .expect("Wasi module expected to export a function _start");
         let memory = take_memory_declaration(&mut sections);
         let datas = take_datas(&mut sections);
         let globals = take_globals(&mut sections);
+        let tables = take_table_declarations(&mut sections);
         Self {
             globals,
             datas,
             functions,
+            function_types,
+            tables,
             start: starting_point,
             memory,
         }
+    }
+
+    pub fn function_signature(&self, idx: FuncTypeIdx) -> Option<Rc<FuncType>> {
+        self.function_types.get_function_type(idx)
+    }
+
+    pub fn tables(&self) -> &[TableType] {
+        &self.tables
     }
 
     pub fn memory_limit(&self) -> Limit {

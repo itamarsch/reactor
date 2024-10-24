@@ -1,0 +1,45 @@
+use crate::types::{Limit, RefType, TableIdx, TableType};
+
+use super::value::Ref;
+
+#[derive(Debug, Clone, Copy)]
+pub struct TableElementIdx(pub usize);
+
+#[derive(Debug)]
+pub struct Tables(Vec<Table>);
+
+impl Tables {
+    pub fn new(table_types: &[TableType]) -> Self {
+        Self(
+            table_types
+                .iter()
+                .map(|TableType(RefType::FuncRef, limit)| Table::new(*limit))
+                .collect(),
+        )
+    }
+
+    pub fn table(&mut self, TableIdx(table_idx): TableIdx) -> &mut Table {
+        &mut self.0[table_idx as usize]
+    }
+}
+
+#[derive(Debug)]
+pub struct Table {
+    refs: Vec<Ref>,
+}
+
+impl Table {
+    pub fn new(limit: Limit) -> Self {
+        Self {
+            refs: vec![Default::default(); limit.min as usize],
+        }
+    }
+
+    pub fn get(&self, TableElementIdx(idx): TableElementIdx) -> Ref {
+        self.refs[idx]
+    }
+
+    pub fn set(&mut self, TableElementIdx(idx): TableElementIdx, element: Ref) {
+        self.refs[idx] = element
+    }
+}

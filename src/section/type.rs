@@ -9,6 +9,10 @@ pub struct TypeSection {
 }
 
 impl TypeSection {
+    pub fn empty() -> Self {
+        Self { funcs: vec![] }
+    }
+
     pub fn parse(input: &[u8]) -> IResult<&[u8], TypeSection> {
         let (input, funcs) = wasm_vec(|input| {
             FuncType::parse(input).map(|(input, func_type)| (input, Rc::new(func_type)))
