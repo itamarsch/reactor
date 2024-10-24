@@ -1,2 +1,5 @@
 /target
-*.wasm
+/out
+perf.data
+perf.data.old
+perf.svg

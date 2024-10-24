@@ -10,4 +10,4 @@ nom-leb128 = "0.2.0"
 paste = "1.0.15"
 
 [profile.release]
-debug = 1
+debug = 2
