@@ -1,7 +1,7 @@
 
 # Reactor
 
-**Reactor** is a lightweight and experimental WebAssembly runtime, built as a learning project. The primary goal was to compile a "Hello, World!" program in Rust and run it inside my very own runtime (which isn't that simple brcause the binary contains **alot** of framework code). While Rustling is not designed for performance or real-world use, it serves as a stepping stone to understanding WebAssembly internals.
+**Reactor** is a lightweight and experimental WebAssembly runtime, built as a learning project. The primary goal was to compile a "Hello, World!" program in Rust and run it inside my very own runtime (which isn't that simple because the binary contains **alot** of framework code). While Rustling is not designed for performance or real-world use, it serves as a stepping stone to understanding WebAssembly internals.
 
 ## What is Rustling?
 
