@@ -164,4 +164,8 @@ impl Memory {
         buf.copy_from_slice(&self.data[src..src + len]);
         self.data[dst..dst + len].copy_from_slice(&buf);
     }
+
+    pub fn size(&self) -> u32 {
+        (self.data.len() / PAGE_SIZE) as u32
+    }
 }

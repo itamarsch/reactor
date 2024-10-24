@@ -289,19 +289,129 @@ impl<'a> Runtime<'a> {
         });
     }
 
+    fn execute_block(&self, block_idx: BlockIdx) {
+        let mut new_function_state = self.current_function_state.borrow().new_block(block_idx);
+        std::mem::swap(
+            &mut new_function_state,
+            self.current_function_state.borrow_mut().deref_mut(),
+        );
+        self.stack
+            .borrow_mut()
+            .push_function_state(new_function_state);
+    }
+
+    fn pop_returns(&self, signature_returns: &[ValueType]) -> Vec<Value> {
+        let amount_of_returns = signature_returns.len();
+        let mut returns = Vec::with_capacity(amount_of_returns);
+        for return_type in signature_returns.iter().rev() {
+            let value = self.stack.borrow_mut().pop_value_by_type(*return_type);
+            returns.push(value);
+        }
+        returns
+    }
+
+    fn reassemble_returns(&self, returns: &mut Vec<Value>) {
+        for _ in 0..returns.len() {
+            self.stack
+                .borrow_mut()
+                .push_value(returns.pop().expect("Pushed enough elements"));
+        }
+    }
+
+    fn return_from_context(
+        &self,
+        signature_returns: &[ValueType],
+        mut get_next_function_state: impl FnMut() -> FunctionState,
+    ) {
+        let mut returns = self.pop_returns(signature_returns);
+        let function_state = get_next_function_state();
+        self.reassemble_returns(&mut returns);
+        *self.current_function_state.borrow_mut() = function_state;
+    }
+
+    fn return_function_end(&self, signature_returns: &[ValueType]) {
+        self.return_from_context(signature_returns, || {
+            self.stack.borrow_mut().pop_function_state()
+        })
+    }
+
+    fn return_immediate(&self, signature_returns: &[ValueType]) {
+        self.return_from_context(signature_returns, || {
+            if !self.current_function_state.borrow().in_block() {
+                self.stack
+                    .borrow_mut()
+                    .push_function_state(self.current_function_state.borrow().clone())
+            }
+            self.stack
+                .borrow_mut()
+                .pop_until_function_state(self.current_function_state.borrow().deref())
+        });
+        self.function_depth.set(self.function_depth.get() - 1);
+    }
+
+    pub fn execute(&self) {
+        loop {
+            let module_borrow = self.module.borrow();
+
+            let Some(Function::Local(current_function)) =
+                module_borrow.get_function(self.current_function_state.borrow().function_idx())
+            else {
+                unreachable!(
+                    "Current runing function cannot be imported and its index has to exist"
+                )
+            };
+
+            if current_function
+                .code
+                .instructions
+                .done(self.current_function_state.borrow().instruction_index())
+            {
+                if self.function_depth.get() > 0 || self.current_function_state.borrow().in_block()
+                {
+                    let borrow = self.current_function_state.borrow();
+                    let index = borrow.instruction_index();
+                    drop(borrow);
+
+                    match index {
+                        function_state::InstructionIndex::IndexInFunction(_) => {
+                            self.return_function_end(&current_function.signature.returns);
+                            self.function_depth.set(self.function_depth.get() - 1);
+                        }
+                        function_state::InstructionIndex::IndexInBlock { block_idx, .. } => {
+                            let block_type =
+                                current_function.code.instructions.get_block_type(block_idx);
+                            let block_type_slice = block_type_to_slice!(block_type);
+                            self.return_function_end(block_type_slice)
+                        }
+                    }
+                    continue;
+                } else {
+                    break;
+                }
+            }
+
+            let instruction = &current_function
+                .code
+                .instructions
+                .get_instruction(self.current_function_state.borrow().instruction_index());
+
+            self.current_function_state.borrow_mut().next_instruction();
+
+            self.run_instruction(instruction, current_function);
+        }
+    }
+
     fn run_instruction(&self, instruction: &Instruction, current_function: &LocalFunction) {
         match instruction {
-            Instruction::Block(block_idx) => self.execute_block(*block_idx),
-            Instruction::Loop(block_idx) => {
-                self.execute_block(*block_idx);
+            Instruction::Unreachable => {
+                panic!("Unreachable!")
             }
+            Instruction::Nop => {}
+            Instruction::Block(block_idx) => self.execute_block(*block_idx),
+            Instruction::Loop(block_idx) => self.execute_block(*block_idx),
             Instruction::If { if_expr, else_expr } => {
                 let condition = self.stack.borrow_mut().pop_bool();
-                if condition {
-                    self.execute_block(*if_expr);
-                } else {
-                    self.execute_block(*else_expr);
-                }
+                self.execute_block(if condition { *if_expr } else { *else_expr });
             }
             Instruction::Break(break_from_idx) => {
                 self.break_from_block(*break_from_idx, current_function);
@@ -387,6 +497,16 @@ impl<'a> Runtime<'a> {
                 let value = self.stack.borrow_mut().pop_value();
                 self.globals.borrow_mut().set(value, *idx);
             }
+            Instruction::TableGet(table_idx) => {
+                let index_in_table = self.stack.borrow_mut().pop_table_element_idx();
+                let ref_value = self
+                    .tables
+                    .borrow_mut()
+                    .table(*table_idx)
+                    .get(index_in_table);
+
+                self.stack.borrow_mut().push_ref(ref_value);
+            }
 
             Instruction::TableSet(table_idx) => {
                 let ref_value = self.stack.borrow_mut().pop_ref();
@@ -425,6 +545,10 @@ impl<'a> Runtime<'a> {
             Instruction::I64Store16(memarg) => memory_store!(self, i64, store_i64_16, memarg),
             Instruction::I64Store32(memarg) => memory_store!(self, i64, store_i64_32, memarg),
 
+            Instruction::MemorySize => self
+                .stack
+                .borrow_mut()
+                .push_u32(self.memory.borrow().size()),
             Instruction::MemoryGrow => {
                 let delta = self.stack.borrow_mut().pop_u32();
                 self.stack
@@ -444,16 +568,16 @@ impl<'a> Runtime<'a> {
             Instruction::F64Const(value) => {
                 self.stack.borrow_mut().push_f64(*value);
             }
-            Instruction::I32Eq => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push bool => a == b
-                );
-            }
             Instruction::I32Eqz => {
                 numeric_operation!(self,
                     pops { a: i32, },
                     push bool => a == 0
+                );
+            }
+            Instruction::I32Eq => {
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push bool => a == b
                 );
             }
             Instruction::I32Ne => {
@@ -486,6 +610,12 @@ impl<'a> Runtime<'a> {
                     push bool => a > b
                 );
             }
+            Instruction::I32LeS => {
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push bool => a <= b
+                );
+            }
             Instruction::I32LeU => {
                 numeric_operation!(self,
                     pops { b: u32, a: u32 },
@@ -516,16 +646,58 @@ impl<'a> Runtime<'a> {
                     push bool => a == b
                 );
             }
+            Instruction::I64Ne => {
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push bool => a != b
+                );
+            }
+            Instruction::I64LtS => {
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push bool => a < b
+                );
+            }
+            Instruction::I64LtU => {
+                numeric_operation!(self,
+                    pops { b: u64, a: u64 },
+                    push bool => a < b
+                );
+            }
+            Instruction::I64GtS => {
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push bool => a > b
+                );
+            }
+            Instruction::I64GtU => {
+                numeric_operation!(self,
+                    pops { b: u64, a: u64 },
+                    push bool => a > b
+                );
+            }
+            Instruction::I64LeS => {
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push bool => a <= b
+                );
+            }
+            Instruction::I64LeU => {
+                numeric_operation!(self,
+                    pops { b: u64, a: u64 },
+                    push bool => a <= b
+                );
+            }
+            Instruction::I64GeS => {
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push bool => a >= b
+                );
+            }
             Instruction::I64GeU => {
                 numeric_operation!(self,
                     pops { b: u64, a: u64 },
                     push bool => a >= b
-                );
-            }
-            Instruction::I64Or => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push i64 => a | b
                 );
             }
             Instruction::I32Add => {
@@ -640,6 +812,12 @@ impl<'a> Runtime<'a> {
                 numeric_operation!(self,
                     pops { b: u64, a: u64 },
                     push u64 => a % b
+                );
+            }
+            Instruction::I64Or => {
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push i64 => a | b
                 );
             }
             Instruction::I64ShrS => {
@@ -789,127 +967,6 @@ impl<'a> Runtime<'a> {
 
             Instruction::PushFuncRef(func) => self.stack.borrow_mut().push_ref(Some(*func)),
             _ => panic!("Instruction: {:?} not implemented ", instruction,),
-        }
-        // println!(
-        //     "Executed: {:?}, current state: {:#?}, stack: {:?}\n",
-        //     instruction,
-        //     self.stack.borrow(),
-        //     self.current_function_state
-        //         .borrow()
-        //         .deref()
-        //         .instruction_index(),
-        // );
-    }
-
-    fn execute_block(&self, block_idx: BlockIdx) {
-        let mut new_function_state = self.current_function_state.borrow().new_block(block_idx);
-        std::mem::swap(
-            &mut new_function_state,
-            self.current_function_state.borrow_mut().deref_mut(),
-        );
-        self.stack
-            .borrow_mut()
-            .push_function_state(new_function_state);
-    }
-
-    fn pop_returns(&self, signature_returns: &[ValueType]) -> Vec<Value> {
-        let amount_of_returns = signature_returns.len();
-        let mut returns = Vec::with_capacity(amount_of_returns);
-        for return_type in signature_returns.iter().rev() {
-            let value = self.stack.borrow_mut().pop_value_by_type(*return_type);
-            returns.push(value);
-        }
-        returns
-    }
-
-    fn reassemble_returns(&self, returns: &mut Vec<Value>) {
-        for _ in 0..returns.len() {
-            self.stack
-                .borrow_mut()
-                .push_value(returns.pop().expect("Pushed enough elements"));
-        }
-    }
-
-    fn return_from_context(
-        &self,
-        signature_returns: &[ValueType],
-        mut get_next_function_state: impl FnMut() -> FunctionState,
-    ) {
-        let mut returns = self.pop_returns(signature_returns);
-        let function_state = get_next_function_state();
-        self.reassemble_returns(&mut returns);
-        *self.current_function_state.borrow_mut() = function_state;
-    }
-
-    fn return_function_end(&self, signature_returns: &[ValueType]) {
-        self.return_from_context(signature_returns, || {
-            self.stack.borrow_mut().pop_function_state()
-        })
-    }
-
-    fn return_immediate(&self, signature_returns: &[ValueType]) {
-        self.return_from_context(signature_returns, || {
-            if !self.current_function_state.borrow().in_block() {
-                self.stack
-                    .borrow_mut()
-                    .push_function_state(self.current_function_state.borrow().clone())
-            }
-            self.stack
-                .borrow_mut()
-                .pop_until_function_state(self.current_function_state.borrow().deref())
-        });
-        self.function_depth.set(self.function_depth.get() - 1);
-    }
-
-    pub fn execute(&self) {
-        loop {
-            let module_borrow = self.module.borrow();
-
-            let Some(Function::Local(current_function)) =
-                module_borrow.get_function(self.current_function_state.borrow().function_idx())
-            else {
-                unreachable!(
-                    "Current runing function cannot be imported and its index has to exist"
-                )
-            };
-
-            if current_function
-                .code
-                .instructions
-                .done(self.current_function_state.borrow().instruction_index())
-            {
-                if self.function_depth.get() > 0 || self.current_function_state.borrow().in_block()
-                {
-                    let borrow = self.current_function_state.borrow();
-                    let index = borrow.instruction_index();
-                    drop(borrow);
-
-                    match index {
-                        function_state::InstructionIndex::IndexInFunction(_) => {
-                            self.return_function_end(&current_function.signature.returns);
-                            self.function_depth.set(self.function_depth.get() - 1);
-                        }
-                        function_state::InstructionIndex::IndexInBlock { block_idx, .. } => {
-                            let block_type =
-                                current_function.code.instructions.get_block_type(block_idx);
-                            let block_type_slice = block_type_to_slice!(block_type);
-                            self.return_function_end(block_type_slice)
-                        }
-                    }
-                    continue;
-                } else {
-                    break;
-                }
-            }
-
-            let instruction = &current_function
-                .code
-                .instructions
-                .get_instruction(self.current_function_state.borrow().instruction_index());
-
-            self.current_function_state.borrow_mut().next_instruction();
-
-            self.run_instruction(instruction, current_function);
         }
     }
 }
