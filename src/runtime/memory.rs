@@ -158,4 +158,10 @@ impl Memory {
     define_store_ext_function!(store_i64_8, i64, 1);
     define_store_ext_function!(store_i64_16, i64, 2);
     define_store_ext_function!(store_i64_32, i64, 4);
+
+    pub fn cpy(&mut self, src: usize, dst: usize, len: usize) {
+        let mut buf = vec![0; len];
+        buf.copy_from_slice(&self.data[src..src + len]);
+        self.data[dst..dst + len].copy_from_slice(&buf);
+    }
 }

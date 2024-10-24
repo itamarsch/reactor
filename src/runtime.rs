@@ -552,10 +552,22 @@ impl<'a> Runtime<'a> {
                     push i32 => a / b
                 );
             }
+            Instruction::I32DivU => {
+                numeric_operation!(self,
+                    pops { b: i32, a: i32 },
+                    push i32 => a / b
+                );
+            }
             Instruction::I32RemS => {
                 numeric_operation!(self,
                     pops { b: i32, a: i32 },
                     push i32 => a % b
+                );
+            }
+            Instruction::I32RemU => {
+                numeric_operation!(self,
+                    pops { b: u32, a: u32 },
+                    push u32 => a % b
                 );
             }
             Instruction::I32And => {
@@ -634,6 +646,12 @@ impl<'a> Runtime<'a> {
                 numeric_operation!(self,
                     pops { b: i64, a: i64 },
                     push i64 => a >> (b % 64)
+                );
+            }
+            Instruction::I64ShrU => {
+                numeric_operation!(self,
+                    pops { b: u64, a: u64 },
+                    push u64 => a >> (b % 64)
                 );
             }
             Instruction::I64Shl => {
@@ -761,6 +779,12 @@ impl<'a> Runtime<'a> {
                     pops { a: i32 },
                     push f64 => a as f64
                 );
+            }
+            Instruction::Memcpy => {
+                let len = self.stack.borrow_mut().pop_u32() as usize;
+                let src = self.stack.borrow_mut().pop_u32() as usize;
+                let dst = self.stack.borrow_mut().pop_u32() as usize;
+                self.memory.borrow_mut().cpy(src, dst, len);
             }
 
             Instruction::PushFuncRef(func) => self.stack.borrow_mut().push_ref(Some(*func)),
