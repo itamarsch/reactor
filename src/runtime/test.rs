@@ -2,41 +2,38 @@ use std::fs;
 use std::io;
 use std::process::Command;
 
-#[test]
-fn test_wat_files() -> io::Result<()> {
-    let bin_dir = "./test";
+fn run_test_for_file(path_str: &str) -> io::Result<()> {
+    let path = std::path::Path::new(path_str);
     let out_dir = "./out";
 
     // Ensure the output directory exists
     fs::create_dir_all(out_dir)?;
 
-    // Iterate over all entries in the bin directory
-    for entry in fs::read_dir(bin_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-
-        // Check if the file has a .wat extension
-        let extension = path.extension().and_then(|s| s.to_str());
-        if let Some(extension @ ("wasm" | "rs")) = extension {
+    let extension = path.extension().and_then(|s| s.to_str());
+    if let Some(extension) = extension {
+        if extension == "wat" || extension == "wasm" || extension == "rs" {
             // Get the filename without extension
             let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap();
 
             // Define the output .wasm file path
             let wasm_output = format!("{}/{}.wasm", out_dir, file_stem);
 
-            // Compile the .wat file to .wasm using wat2wasm
-
-            let status = if extension == "wasm" {
+            // Compile the file to .wasm using appropriate tool
+            let status = if extension == "wat" {
                 Command::new("wat2wasm")
-                    .arg(&path)
+                    .arg(path)
                     .arg("-o")
                     .arg(&wasm_output)
                     .status()?
+            } else if extension == "wasm" {
+                fs::copy(path, &wasm_output)?;
+                // Create a successful exit status
+                Command::new("true").status()?
             } else if extension == "rs" {
                 Command::new("rustc")
                     .arg("--target=wasm32-wasi")
                     .arg("-O")
-                    .arg(&path)
+                    .arg(path)
                     .arg("-o")
                     .arg(&wasm_output)
                     .status()?
@@ -46,7 +43,7 @@ fn test_wat_files() -> io::Result<()> {
 
             assert!(
                 status.success(),
-                "wat2wasm failed on {:?} with exit code {:?}",
+                "Compilation failed on {:?} with exit code {:?}",
                 path,
                 status.code()
             );
@@ -87,3 +84,6 @@ fn test_wat_files() -> io::Result<()> {
 
     Ok(())
 }
+
+// Include the generated test functions
+include!(concat!(env!("OUT_DIR"), "/tests_generated.rs"));
