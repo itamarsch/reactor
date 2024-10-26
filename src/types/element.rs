@@ -1,15 +1,43 @@
 use nom::{bytes::complete::tag, IResult};
 use nom_leb128::leb128_u32;
 
+use crate::module::functions::{Function, LocalFunction};
+
 use super::{wasm_vec, Expr, FuncIdx, Instruction, RefType, TableIdx};
 
 #[derive(Debug)]
 pub struct Element {
     pub ref_type: RefType,
-    pub init: Vec<Expr>,
+    pub init: Vec<FuncIdx>,
     pub mode: ElementMode,
 }
 
+#[derive(Debug)]
+pub struct ElementDeclaration {
+    pub ref_type: RefType,
+    pub init: Vec<Expr>,
+    pub mode: ElementModeDeclaration,
+}
+
+#[derive(Debug)]
+pub enum ElementModeDeclaration {
+    Passive,
+    Active {
+        table: TableIdx,
+        offset_in_table: Expr,
+    },
+    Declarative,
+}
+
+#[derive(Debug)]
+pub enum ElementMode {
+    Passive,
+    Active {
+        table: TableIdx,
+        offset_in_table: FuncIdx,
+    },
+    Declarative,
+}
 fn func_idx_to_initializer(functions: Vec<FuncIdx>) -> Vec<Expr> {
     functions
         .into_iter()
@@ -17,8 +45,8 @@ fn func_idx_to_initializer(functions: Vec<FuncIdx>) -> Vec<Expr> {
         .collect()
 }
 
-impl Element {
-    pub fn parse(input: &[u8]) -> IResult<&[u8], Element> {
+impl ElementDeclaration {
+    pub fn parse(input: &[u8]) -> IResult<&[u8], ElementDeclaration> {
         let (input, variant) = leb128_u32(input)?;
         let (input, element) = match variant {
             0 => {
@@ -26,10 +54,10 @@ impl Element {
                 let (input, functions) = wasm_vec(FuncIdx::parse)(input)?;
                 (
                     input,
-                    Element {
+                    ElementDeclaration {
                         ref_type: RefType::FuncRef,
                         init: func_idx_to_initializer(functions),
-                        mode: ElementMode::Active {
+                        mode: ElementModeDeclaration::Active {
                             table: TableIdx(0),
                             offset_in_table,
                         },
@@ -41,10 +69,10 @@ impl Element {
                 let (input, functions) = wasm_vec(FuncIdx::parse)(input)?;
                 (
                     input,
-                    Element {
+                    ElementDeclaration {
                         ref_type: RefType::FuncRef,
                         init: func_idx_to_initializer(functions),
-                        mode: ElementMode::Passive,
+                        mode: ElementModeDeclaration::Passive,
                     },
                 )
             }
@@ -55,10 +83,10 @@ impl Element {
                 let (input, functions) = wasm_vec(FuncIdx::parse)(input)?;
                 (
                     input,
-                    Element {
+                    ElementDeclaration {
                         ref_type: RefType::FuncRef,
                         init: func_idx_to_initializer(functions),
-                        mode: ElementMode::Active {
+                        mode: ElementModeDeclaration::Active {
                             table,
                             offset_in_table: offset,
                         },
@@ -70,10 +98,10 @@ impl Element {
                 let (input, functions) = wasm_vec(FuncIdx::parse)(input)?;
                 (
                     input,
-                    Element {
+                    ElementDeclaration {
                         ref_type: RefType::FuncRef,
                         init: func_idx_to_initializer(functions),
-                        mode: ElementMode::Declarative,
+                        mode: ElementModeDeclaration::Declarative,
                     },
                 )
             }
@@ -82,10 +110,10 @@ impl Element {
                 let (input, init) = wasm_vec(Expr::parse)(input)?;
                 (
                     input,
-                    Element {
+                    ElementDeclaration {
                         ref_type: RefType::FuncRef,
                         init,
-                        mode: ElementMode::Active {
+                        mode: ElementModeDeclaration::Active {
                             table: TableIdx(0),
                             offset_in_table: offset,
                         },
@@ -97,10 +125,10 @@ impl Element {
                 let (input, init) = wasm_vec(Expr::parse)(input)?;
                 (
                     input,
-                    Element {
+                    ElementDeclaration {
                         ref_type,
                         init,
-                        mode: ElementMode::Passive,
+                        mode: ElementModeDeclaration::Passive,
                     },
                 )
             }
@@ -111,10 +139,10 @@ impl Element {
                 let (input, init) = wasm_vec(Expr::parse)(input)?;
                 (
                     input,
-                    Element {
+                    ElementDeclaration {
                         ref_type,
                         init,
-                        mode: ElementMode::Active {
+                        mode: ElementModeDeclaration::Active {
                             table: table_idx,
                             offset_in_table: offset,
                         },
@@ -126,10 +154,10 @@ impl Element {
                 let (input, init) = wasm_vec(Expr::parse)(input)?;
                 (
                     input,
-                    Element {
+                    ElementDeclaration {
                         ref_type,
                         init,
-                        mode: ElementMode::Declarative,
+                        mode: ElementModeDeclaration::Declarative,
                     },
                 )
             }
@@ -138,16 +166,36 @@ impl Element {
 
         Ok((input, element))
     }
-}
 
-#[derive(Debug)]
-pub enum ElementMode {
-    Passive,
-    Active {
-        table: TableIdx,
-        offset_in_table: Expr,
-    },
-    Declarative,
+    pub fn add_to_module(self, functions: &mut Vec<Function<'_>>) -> Element {
+        Element {
+            init: self
+                .init
+                .into_iter()
+                .map(|e| {
+                    let idx = FuncIdx(functions.len() as u32);
+                    functions.push(Function::Local(LocalFunction::expr(e)));
+                    idx
+                })
+                .collect(),
+            ref_type: self.ref_type,
+            mode: match self.mode {
+                ElementModeDeclaration::Passive => ElementMode::Passive,
+                ElementModeDeclaration::Active {
+                    table,
+                    offset_in_table,
+                } => {
+                    let idx = FuncIdx(functions.len() as u32);
+                    functions.push(Function::Local(LocalFunction::expr(offset_in_table)));
+                    ElementMode::Active {
+                        offset_in_table: idx,
+                        table,
+                    }
+                }
+                ElementModeDeclaration::Declarative => ElementMode::Declarative,
+            },
+        }
+    }
 }
 
 #[derive(Debug)]

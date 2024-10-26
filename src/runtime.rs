@@ -9,7 +9,7 @@ use crate::{
         functions::{Function, LocalFunction},
         Module,
     },
-    types::{BlockIdx, ElementMode, Expr, FuncIdx, Instruction, ValueType},
+    types::{BlockIdx, ElementMode, FuncIdx, Instruction, ValueType},
     wasi::Wasi,
 };
 
@@ -144,11 +144,9 @@ impl<'a> Runtime<'a> {
         );
     }
 
-    pub fn run_expr<T>(&self, expr: Expr, mut get_result_after_expr: impl FnMut() -> T) -> T {
-        let idx = self.module.borrow_mut().add_expr(expr);
-
+    pub fn run_expr<T>(&self, expr: FuncIdx, mut get_result_after_expr: impl FnMut() -> T) -> T {
         // Swaped in next line
-        let mut function_state_before_expr = FunctionState::new_function(Locals::empty(), idx);
+        let mut function_state_before_expr = FunctionState::new_function(Locals::empty(), expr);
         std::mem::swap(
             &mut function_state_before_expr,
             self.current_function_state.borrow_mut().deref_mut(),
@@ -162,22 +160,17 @@ impl<'a> Runtime<'a> {
             &mut function_state_before_expr,
             self.current_function_state.borrow_mut().deref_mut(),
         );
-        self.module.borrow_mut().remove_expr(idx);
 
         result
     }
 
     fn initilize_elements(&self) {
-        let mut module_borrow = self.module.borrow_mut();
-        let elements = module_borrow.elements();
-        drop(module_borrow);
+        let module_borrow = self.module.borrow();
 
-        for element in elements {
+        for element in module_borrow.elements() {
             match element.mode {
                 ElementMode::Declarative => {}
-                ElementMode::Passive => {
-                    todo!()
-                }
+                ElementMode::Passive => {}
                 ElementMode::Active {
                     table,
                     offset_in_table,
@@ -187,8 +180,8 @@ impl<'a> Runtime<'a> {
                     });
                     let refs = element
                         .init
-                        .into_iter()
-                        .map(|init| self.run_expr(init, || self.stack.borrow_mut().pop_ref()))
+                        .iter()
+                        .map(|init| self.run_expr(*init, || self.stack.borrow_mut().pop_ref()))
                         .collect::<Vec<_>>();
 
                     self.tables.borrow_mut().table(table).fill(offset, &refs);
@@ -201,13 +194,11 @@ impl<'a> Runtime<'a> {
         let borrow = self.module.borrow();
 
         let initializers = borrow.global_initializers();
-        let initializers = initializers.to_vec();
-        drop(borrow);
 
         let globals = initializers
             .iter()
             .map(|global| {
-                let value = self.run_expr(global.init.clone(), || {
+                let value = self.run_expr(global.init, || {
                     self.stack
                         .borrow_mut()
                         .pop_value_by_type(global.signature.valtype)
@@ -220,20 +211,15 @@ impl<'a> Runtime<'a> {
     }
 
     fn run_datas(&self) {
-        let mut offset_calulations_to_run = vec![];
-        for (i, data) in self.module.borrow().datas().iter().enumerate() {
+        let module = self.module.borrow();
+        for data in module.datas().iter() {
             match data.mode {
                 crate::types::DataMode::Passive => continue,
                 crate::types::DataMode::Active { ref offset, .. } => {
-                    offset_calulations_to_run.push((offset.clone(), i))
+                    let offset = self.run_expr(*offset, || self.stack.borrow_mut().pop_u32());
+                    self.memory.borrow_mut().fill_data(offset, &data.init);
                 }
             }
-        }
-        for (offset_instructions, data_index) in offset_calulations_to_run {
-            let offset = self.run_expr(offset_instructions, || self.stack.borrow_mut().pop_u32());
-            self.memory
-                .borrow_mut()
-                .fill_data(offset, &self.module.borrow().datas()[data_index].init);
         }
     }
 

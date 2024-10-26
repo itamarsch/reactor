@@ -1,12 +1,12 @@
 use nom::IResult;
 
-use crate::types::{wasm_vec, Data};
+use crate::types::{wasm_vec, DataDeclaration};
 
 #[derive(Debug)]
-pub struct DataSection(pub Vec<Data>);
+pub struct DataSection(pub Vec<DataDeclaration>);
 
 impl DataSection {
     pub fn parse(input: &[u8]) -> IResult<&[u8], DataSection> {
-        wasm_vec(Data::parse)(input).map(|(input, datas)| (input, DataSection(datas)))
+        wasm_vec(DataDeclaration::parse)(input).map(|(input, datas)| (input, DataSection(datas)))
     }
 }

@@ -43,11 +43,11 @@ pub use block_type::BlockType;
 
 pub use label_index::LabelIdx;
 
-pub use element::{Element, ElementIdx, ElementMode};
+pub use element::{Element, ElementDeclaration, ElementIdx, ElementMode};
 
 pub use ref_type::RefType;
 
-pub use data::{Data, DataIdx, DataMode};
+pub use data::{Data, DataDeclaration, DataIdx, DataMode};
 
 pub use code::Expr;
 

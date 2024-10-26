@@ -2,13 +2,25 @@ use std::{collections::HashMap, rc::Rc};
 
 use crate::{
     section::{import::ImportSection, r#type::TypeSection, Section, SectionType},
-    types::{FuncIdx, FuncType, FunctionCode, ImportDesc},
+    types::{Expr, FuncIdx, FuncType, FunctionCode, ImportDesc, LocalTypes},
 };
 
 #[derive(Debug)]
 pub struct LocalFunction {
     pub signature: Rc<FuncType>,
     pub code: FunctionCode,
+}
+
+impl LocalFunction {
+    pub fn expr(expr: Expr) -> Self {
+        Self {
+            signature: Rc::new(FuncType::empty()),
+            code: super::FunctionCode {
+                locals: LocalTypes::empty(),
+                instructions: expr,
+            },
+        }
+    }
 }
 
 #[derive(Debug)]

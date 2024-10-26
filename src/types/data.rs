@@ -1,7 +1,21 @@
 use nom::{number::complete::u8, IResult};
 use nom_leb128::leb128_u32;
 
-use super::{wasm_vec, Expr, MemoryIdx};
+use crate::module::functions::{self, Function};
+
+use super::{wasm_vec, Expr, FuncIdx, MemoryIdx};
+
+#[derive(Debug)]
+pub struct DataDeclaration {
+    init: Vec<u8>,
+    mode: DataDeclarationMode,
+}
+
+#[derive(Debug)]
+enum DataDeclarationMode {
+    Passive,
+    Active { memidx: MemoryIdx, offset: Expr },
+}
 
 #[derive(Debug)]
 pub struct Data {
@@ -9,8 +23,14 @@ pub struct Data {
     pub mode: DataMode,
 }
 
-impl Data {
-    pub fn parse(input: &[u8]) -> IResult<&[u8], Data> {
+#[derive(Debug)]
+pub enum DataMode {
+    Passive,
+    Active { memidx: MemoryIdx, offset: FuncIdx },
+}
+
+impl DataDeclaration {
+    pub fn parse(input: &[u8]) -> IResult<&[u8], DataDeclaration> {
         let (input, variant) = leb128_u32(input)?;
         let (input, data) = match variant {
             0 => {
@@ -18,9 +38,9 @@ impl Data {
                 let (input, init) = wasm_vec(u8)(input)?;
                 (
                     input,
-                    Data {
+                    DataDeclaration {
                         init,
-                        mode: DataMode::Active {
+                        mode: DataDeclarationMode::Active {
                             memidx: MemoryIdx(0),
                             offset,
                         },
@@ -31,9 +51,9 @@ impl Data {
                 let (input, init) = wasm_vec(u8)(input)?;
                 (
                     input,
-                    Data {
+                    DataDeclaration {
                         init,
-                        mode: DataMode::Passive,
+                        mode: DataDeclarationMode::Passive,
                     },
                 )
             }
@@ -43,9 +63,9 @@ impl Data {
                 let (input, init) = wasm_vec(u8)(input)?;
                 (
                     input,
-                    Data {
+                    DataDeclaration {
                         init,
-                        mode: DataMode::Active { memidx, offset },
+                        mode: DataDeclarationMode::Active { memidx, offset },
                     },
                 )
             }
@@ -53,12 +73,23 @@ impl Data {
         };
         Ok((input, data))
     }
-}
 
-#[derive(Debug)]
-pub enum DataMode {
-    Passive,
-    Active { memidx: MemoryIdx, offset: Expr },
+    pub fn add_to_module(self, functions: &mut Vec<Function<'_>>) -> Data {
+        Data {
+            init: self.init,
+            mode: match self.mode {
+                DataDeclarationMode::Passive => DataMode::Passive,
+                DataDeclarationMode::Active { memidx, offset } => {
+                    let idx = FuncIdx(functions.len() as u32);
+                    functions.push(Function::Local(functions::LocalFunction::expr(offset)));
+                    DataMode::Active {
+                        memidx,
+                        offset: idx,
+                    }
+                }
+            },
+        }
+    }
 }
 
 #[derive(Debug)]

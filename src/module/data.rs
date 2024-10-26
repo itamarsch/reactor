@@ -5,7 +5,12 @@ use crate::{
     types::Data,
 };
 
-pub fn take_datas<'a>(sections: &mut HashMap<SectionType<'a>, Section<'a>>) -> Vec<Data> {
+use super::functions::Function;
+
+pub fn take_datas<'a>(
+    sections: &mut HashMap<SectionType<'a>, Section<'a>>,
+    functions: &mut Vec<Function<'_>>,
+) -> Vec<Data> {
     let Some(datas) = sections.remove(&SectionType::Data) else {
         return vec![];
     };
@@ -13,5 +18,9 @@ pub fn take_datas<'a>(sections: &mut HashMap<SectionType<'a>, Section<'a>>) -> V
         unreachable!();
     };
 
-    data_section.0
+    data_section
+        .0
+        .into_iter()
+        .map(|e| e.add_to_module(functions))
+        .collect()
 }

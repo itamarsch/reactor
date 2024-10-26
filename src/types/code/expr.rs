@@ -1,5 +1,5 @@
 use std::{
-    cell::{OnceCell, Ref, RefCell},
+    cell::{OnceCell, RefCell},
     ops::Deref,
     rc::Rc,
 };
@@ -10,10 +10,10 @@ use crate::{runtime::function_state::InstructionIndex, types::BlockType};
 
 use super::{instruction::BlockIdx, Instruction};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Expr {
-    expr: Rc<RefCell<Instructions>>,
-    blocks: Rc<RefCell<Blocks>>,
+    expr: Instructions,
+    blocks: Blocks,
 }
 
 impl Expr {
@@ -22,71 +22,57 @@ impl Expr {
         let block_stack = Rc::new(RefCell::new(vec![]));
         let (input, instructions) =
             Instructions::parse(input, blocks.clone(), block_stack.clone())?;
+        let blocks = Rc::try_unwrap(blocks).unwrap().into_inner();
         assert!(block_stack.deref().borrow().is_empty());
         Ok((
             input,
             Self {
-                expr: Rc::new(RefCell::new(instructions)),
+                expr: instructions,
                 blocks,
             },
         ))
     }
 
-    pub fn get_block_type(&self, block_idx: BlockIdx) -> Ref<BlockType> {
-        let block_ref = self.blocks.deref().borrow();
-        Ref::map(block_ref, |blocks| &blocks.get(block_idx).1)
+    pub fn get_block_type(&self, block_idx: BlockIdx) -> BlockType {
+        self.blocks.get(block_idx).1
     }
 
     pub fn is_block_loop(&self, block_idx: BlockIdx) -> bool {
-        self.blocks.deref().borrow().get(block_idx).is_loop()
+        self.blocks.get(block_idx).is_loop()
     }
 
     pub fn from_raw_instructions(instructions: Vec<Instruction>) -> Self {
         Self {
-            expr: Rc::new(RefCell::new(Instructions(instructions))),
-            blocks: Rc::new(RefCell::new(Blocks::empty())),
+            expr: Instructions(instructions),
+            blocks: Blocks::empty(),
         }
     }
 
     pub fn amount_of_instructions_in_block(&self, block_idx: BlockIdx) -> usize {
-        self.blocks.deref().borrow().get(block_idx).0.len()
+        self.blocks.get(block_idx).0.len()
     }
 
-    pub fn get_instruction(&self, state: InstructionIndex) -> Ref<Instruction> {
+    pub fn get_instruction(&self, state: InstructionIndex) -> &Instruction {
         match state {
-            InstructionIndex::IndexInFunction(i) => {
-                let expr = self.expr.borrow();
-                Ref::map(expr, |expr| &expr[i])
-            }
+            InstructionIndex::IndexInFunction(i) => &self.expr[i],
             InstructionIndex::IndexInBlock {
                 block_idx,
                 index_in_block: i,
                 ..
             } => {
-                let blocks = self.blocks.deref().borrow();
-                Ref::map(blocks, |blocks| {
-                    let current_block = &blocks.get(block_idx);
-                    &current_block.instructions()[i]
-                })
+                let current_block = &self.blocks.get(block_idx);
+                &current_block.instructions()[i]
             }
         }
     }
     pub fn done(&self, state: InstructionIndex) -> bool {
         match state {
-            InstructionIndex::IndexInFunction(i) => self.expr.borrow().0.len() == i,
+            InstructionIndex::IndexInFunction(i) => self.expr.0.len() == i,
             InstructionIndex::IndexInBlock {
                 block_idx,
                 index_in_block: i,
                 ..
-            } => {
-                self.blocks
-                    .deref()
-                    .borrow()
-                    .get(block_idx)
-                    .instructions()
-                    .len()
-                    == i
-            }
+            } => self.blocks.get(block_idx).instructions().len() == i,
         }
     }
 }

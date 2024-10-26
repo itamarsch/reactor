@@ -48,4 +48,11 @@ impl FuncType {
             .collect();
         Ok((input, FuncType { params, returns }))
     }
+
+    pub fn empty() -> Self {
+        Self {
+            params: vec![],
+            returns: vec![],
+        }
+    }
 }

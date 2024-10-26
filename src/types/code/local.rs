@@ -19,6 +19,9 @@ impl LocalTypes {
             ),
         ))
     }
+    pub fn empty() -> Self {
+        Self(vec![])
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
