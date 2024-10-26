@@ -676,6 +676,23 @@ impl<'a> Runtime<'a> {
                 let addr = self.stack.borrow_mut().pop_u32() as usize;
                 self.memory.borrow_mut().fill_value(len, addr, value);
             }
+
+            Instruction::TableInit(element_idx, table_idx) => {
+                let module = self.module.borrow();
+                let elem = &module.elements()[element_idx.0 as usize];
+                let len = self.stack.borrow_mut().pop_u32() as usize;
+                let src = self.stack.borrow_mut().pop_u32() as usize;
+                let dst = self.stack.borrow_mut().pop_u32() as usize;
+                let inits = elem.init[src..src + len]
+                    .iter()
+                    .map(|init| self.run_expr(*init, || self.stack.borrow_mut().pop_ref()));
+                let mut tables = self.tables.borrow_mut();
+                let table = tables.table(*table_idx);
+                for (i, func_ref) in inits.enumerate() {
+                    table.set(TableElementIdx(i + dst), func_ref);
+                }
+            }
+            Instruction::ElementDrop(_) => {}
             _ => panic!("Instruction: {:?} not implemented ", instruction,),
         }
     }
