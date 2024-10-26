@@ -36,9 +36,9 @@ mod variable;
 #[cfg(test)]
 mod test;
 
-pub struct Runtime<'a> {
+pub struct Runtime<'b, 'a> {
     stack: RefCell<Stack>,
-    module: RefCell<Module<'a>>,
+    module: &'b Module<'a>,
     current_function_state: RefCell<FunctionState>,
     function_depth: Cell<usize>,
     memory: RefCell<Memory>,
@@ -98,8 +98,8 @@ macro_rules! block_type_to_slice {
     };
 }
 
-impl<'a> Runtime<'a> {
-    pub fn new(module: Module<'a>) -> Self {
+impl<'a, 'b> Runtime<'b, 'a> {
+    pub fn new(module: &'b Module<'a>) -> Self {
         let (start_idx, Function::Local(starting_function)) = module.get_main() else {
             panic!("Cannot start from imported function")
         };
@@ -123,7 +123,7 @@ impl<'a> Runtime<'a> {
             stack: RefCell::new(stack),
             globals: RefCell::new(Globals::new()),
             tables: RefCell::new(tables),
-            module: RefCell::new(module),
+            module,
             current_function_state: RefCell::new(initial_function_state),
             wasi: RefCell::new(Wasi::new()),
             function_depth: Cell::new(0),
@@ -166,13 +166,13 @@ impl<'a> Runtime<'a> {
     }
 
     fn run_start(&self) {
-        if let Some(start_idx) = self.module.borrow().get_initializer() {
+        if let Some(start_idx) = self.module.get_initializer() {
             self.run_expr(start_idx, || {});
         }
     }
 
     fn initilize_elements(&self) {
-        let module_borrow = self.module.borrow();
+        let module_borrow = self.module;
 
         for element in module_borrow.elements() {
             match element.mode {
@@ -191,18 +191,19 @@ impl<'a> Runtime<'a> {
                         .map(|init| self.run_expr(*init, || self.stack.borrow_mut().pop_ref()))
                         .collect::<Vec<_>>();
 
-                    self.tables.borrow_mut().table(table).fill(offset, &refs);
+                    self.tables
+                        .borrow_mut()
+                        .table_mut(table)
+                        .fill(offset, &refs);
                 }
             }
         }
     }
 
     fn initialize_globals(&self) {
-        let borrow = self.module.borrow();
-
-        let initializers = borrow.global_initializers();
-
-        let globals = initializers
+        let globals = self
+            .module
+            .global_initializers()
             .iter()
             .map(|global| {
                 let value = self.run_expr(global.init, || {
@@ -218,8 +219,7 @@ impl<'a> Runtime<'a> {
     }
 
     fn initialize_datas(&self) {
-        let module = self.module.borrow();
-        for data in module.datas().iter() {
+        for data in self.module.datas().iter() {
             match data.mode {
                 crate::types::DataMode::Passive => continue,
                 crate::types::DataMode::Active { ref offset, .. } => {
@@ -231,8 +231,7 @@ impl<'a> Runtime<'a> {
     }
 
     fn call_function(&self, func_idx: FuncIdx) {
-        let module_borrow = self.module.borrow();
-        let next_function = module_borrow.get_function(func_idx).unwrap();
+        let next_function = self.module.get_function(func_idx).unwrap();
         match next_function {
             Function::Local(function) => {
                 self.function_depth.set(self.function_depth.get() + 1);
@@ -347,10 +346,9 @@ impl<'a> Runtime<'a> {
 
     pub fn execute(&self) {
         loop {
-            let module_borrow = self.module.borrow();
-
-            let Some(Function::Local(current_function)) =
-                module_borrow.get_function(self.current_function_state.borrow().function_idx())
+            let Some(Function::Local(current_function)) = self
+                .module
+                .get_function(self.current_function_state.borrow().function_idx())
             else {
                 unreachable!(
                     "Current runing function cannot be imported and its index has to exist"
@@ -434,18 +432,17 @@ impl<'a> Runtime<'a> {
                 self.call_function(*func_idx);
             }
             Instruction::CallIndirect(type_idx, table_idx) => {
-                let mut tables_borrow = self.tables.borrow_mut();
+                let tables_borrow = self.tables.borrow();
                 let table = tables_borrow.table(*table_idx);
                 let table_element_idx = self.stack.borrow_mut().pop_table_element_idx();
                 let Some(func_idx) = table.get(table_element_idx) else {
                     panic!("Issued call_indirect on a null reference.")
                 };
 
-                let module_borrow = self.module.borrow();
-                let Some(func) = module_borrow.get_function(func_idx) else {
+                let Some(func) = self.module.get_function(func_idx) else {
                     panic!("Function index in table isn't a valid function index");
                 };
-                let Some(signature) = module_borrow.function_signature(*type_idx) else {
+                let Some(signature) = self.module.function_signature(*type_idx) else {
                     panic!("call_indirect has invalid type index");
                 };
                 if func.signature().deref() != signature.deref() {
@@ -495,11 +492,8 @@ impl<'a> Runtime<'a> {
             }
             Instruction::TableGet(table_idx) => {
                 let index_in_table = self.stack.borrow_mut().pop_table_element_idx();
-                let ref_value = self
-                    .tables
-                    .borrow_mut()
-                    .table(*table_idx)
-                    .get(index_in_table);
+                let tables = self.tables.borrow();
+                let ref_value = tables.table(*table_idx).get(index_in_table);
 
                 self.stack.borrow_mut().push_ref(ref_value);
             }
@@ -509,7 +503,7 @@ impl<'a> Runtime<'a> {
                 let index_in_table = self.stack.borrow_mut().pop_table_element_idx();
                 self.tables
                     .borrow_mut()
-                    .table(*table_idx)
+                    .table_mut(*table_idx)
                     .set(index_in_table, ref_value);
             }
 
@@ -651,8 +645,7 @@ impl<'a> Runtime<'a> {
             Instruction::PushFuncRef(func) => self.stack.borrow_mut().push_ref(Some(*func)),
 
             Instruction::MemoryInit(data_idx) => {
-                let module = self.module.borrow();
-                let data = &module.datas()[data_idx.0 as usize];
+                let data = &self.module.datas()[data_idx.0 as usize];
                 assert!(
                     matches!(data.mode, DataMode::Passive),
                     "Can only init passive data"
@@ -678,8 +671,7 @@ impl<'a> Runtime<'a> {
             }
 
             Instruction::TableInit(element_idx, table_idx) => {
-                let module = self.module.borrow();
-                let elem = &module.elements()[element_idx.0 as usize];
+                let elem = &self.module.elements()[element_idx.0 as usize];
                 let len = self.stack.borrow_mut().pop_u32() as usize;
                 let src = self.stack.borrow_mut().pop_u32() as usize;
                 let dst = self.stack.borrow_mut().pop_u32() as usize;
@@ -687,7 +679,7 @@ impl<'a> Runtime<'a> {
                     .iter()
                     .map(|init| self.run_expr(*init, || self.stack.borrow_mut().pop_ref()));
                 let mut tables = self.tables.borrow_mut();
-                let table = tables.table(*table_idx);
+                let table = tables.table_mut(*table_idx);
                 for (i, func_ref) in inits.enumerate() {
                     table.set(TableElementIdx(i + dst), func_ref);
                 }

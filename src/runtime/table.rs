@@ -18,8 +18,12 @@ impl Tables {
         )
     }
 
-    pub fn table(&mut self, TableIdx(table_idx): TableIdx) -> &mut Table {
+    pub fn table_mut(&mut self, TableIdx(table_idx): TableIdx) -> &mut Table {
         &mut self.0[table_idx as usize]
+    }
+
+    pub fn table(&self, TableIdx(table_idx): TableIdx) -> &Table {
+        &self.0[table_idx as usize]
     }
 }
 

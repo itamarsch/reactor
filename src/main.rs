@@ -6,6 +6,6 @@ fn main() {
 
     let module = Module::new(&file[..]);
 
-    let runtime = Runtime::new(module);
+    let runtime = Runtime::new(&module);
     runtime.execute();
 }
