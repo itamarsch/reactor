@@ -12,7 +12,7 @@ use self::{
     functions::{take_functions, Function},
     globals::take_globals,
     memory::take_memory_declaration,
-    start::get_starting_function_index,
+    start::{get_main_index, take_start_index},
     tables::take_table_declarations,
 };
 
@@ -33,7 +33,8 @@ pub struct Module<'a> {
     globals: Vec<GlobalInitializer>,
 
     tables: Vec<TableType>,
-    start: FuncIdx,
+    main: FuncIdx,
+    start: Option<FuncIdx>,
     memory: Limit,
 }
 
@@ -43,8 +44,8 @@ impl<'t> Module<'t> {
 
         let (mut functions, function_types) = take_functions(&mut sections);
 
-        let starting_point = get_starting_function_index(&mut sections)
-            .expect("Wasi module expected to export a function _start");
+        let main_idx =
+            get_main_index(&sections).expect("Wasi module expected to export a function _start");
         let memory = take_memory_declaration(&mut sections);
 
         let datas = take_datas(&mut sections, &mut functions);
@@ -52,15 +53,17 @@ impl<'t> Module<'t> {
         let globals = take_globals(&mut sections, &mut functions);
         let tables = take_table_declarations(&mut sections);
         let elements = take_element_declarations(&mut sections, &mut functions);
+        let start = take_start_index(&mut sections);
 
         Self {
+            start,
             elements,
             globals,
             datas,
             functions,
             function_types,
             tables,
-            start: starting_point,
+            main: main_idx,
             memory,
         }
     }
@@ -81,12 +84,16 @@ impl<'t> Module<'t> {
         self.memory
     }
 
-    pub fn get_starting_function(&self) -> (FuncIdx, &Function) {
+    pub fn get_main(&self) -> (FuncIdx, &Function) {
         (
-            self.start,
-            self.get_function(self.start)
+            self.main,
+            self.get_function(self.main)
                 .expect("starting index should be valid"),
         )
+    }
+
+    pub fn get_initializer(&self) -> Option<FuncIdx> {
+        self.start
     }
 
     pub fn get_function(&self, FuncIdx(idx): FuncIdx) -> Option<&Function> {

@@ -100,7 +100,7 @@ macro_rules! block_type_to_slice {
 
 impl<'a> Runtime<'a> {
     pub fn new(module: Module<'a>) -> Self {
-        let (start_idx, Function::Local(starting_function)) = module.get_starting_function() else {
+        let (start_idx, Function::Local(starting_function)) = module.get_main() else {
             panic!("Cannot start from imported function")
         };
 
@@ -131,7 +131,8 @@ impl<'a> Runtime<'a> {
 
         runtime.initilize_elements();
         runtime.initialize_globals();
-        runtime.run_datas();
+        runtime.initialize_datas();
+        runtime.run_start();
 
         runtime
     }
@@ -162,6 +163,12 @@ impl<'a> Runtime<'a> {
         );
 
         result
+    }
+
+    fn run_start(&self) {
+        if let Some(start_idx) = self.module.borrow().get_initializer() {
+            self.run_expr(start_idx, || {});
+        }
     }
 
     fn initilize_elements(&self) {
@@ -210,7 +217,7 @@ impl<'a> Runtime<'a> {
         self.globals.borrow_mut().fill(globals);
     }
 
-    fn run_datas(&self) {
+    fn initialize_datas(&self) {
         let module = self.module.borrow();
         for data in module.datas().iter() {
             match data.mode {
