@@ -47,11 +47,11 @@ pub struct Runtime<'a> {
     tables: RefCell<Tables>,
 }
 
-macro_rules! numeric_operation {
+macro_rules! op {
     (
         $self:expr,
-        pops { $( $ident:ident : $type:ident ),* $(,)? },
-        push $result_type:ident => $expr:expr
+        { $( $ident:ident : $type:ident ),* $(,)? },
+        $result_type:ident => $expr:expr
     ) => {
         {
             paste! {
@@ -559,524 +559,104 @@ impl<'a> Runtime<'a> {
                     .push_i32(self.memory.borrow_mut().grow(delta));
             }
 
-            Instruction::I32Const(value) => {
-                self.stack.borrow_mut().push_i32(*value);
-            }
-            Instruction::I64Const(value) => {
-                self.stack.borrow_mut().push_i64(*value);
-            }
-            Instruction::F32Const(value) => {
-                self.stack.borrow_mut().push_f32(*value);
-            }
-            Instruction::F64Const(value) => {
-                self.stack.borrow_mut().push_f64(*value);
-            }
-            Instruction::I32Eqz => {
-                numeric_operation!(self,
-                    pops { a: i32, },
-                    push bool => a == 0
-                );
-            }
-            Instruction::I32Eq => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push bool => a == b
-                );
-            }
-            Instruction::I32Ne => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push bool => a != b
-                );
-            }
-            Instruction::I32LtS => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push bool => a < b
-                );
-            }
-            Instruction::I32LtU => {
-                numeric_operation!(self,
-                    pops { b: u32, a: u32 },
-                    push bool => a < b
-                );
-            }
-            Instruction::I32GtS => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push bool => a > b
-                );
-            }
-            Instruction::I32GtU => {
-                numeric_operation!(self,
-                    pops { b: u32, a: u32 },
-                    push bool => a > b
-                );
-            }
-            Instruction::I32LeS => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push bool => a <= b
-                );
-            }
-            Instruction::I32LeU => {
-                numeric_operation!(self,
-                    pops { b: u32, a: u32 },
-                    push bool => a <= b
-                );
-            }
-            Instruction::I32GeS => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push bool => a >= b
-                );
-            }
-            Instruction::I32GeU => {
-                numeric_operation!(self,
-                    pops { b: u32, a: u32 },
-                    push bool => a >= b
-                );
-            }
-            Instruction::I64Eqz => {
-                numeric_operation!(self,
-                    pops { a: i64 },
-                    push bool => a == 0
-                );
-            }
-            Instruction::I64Eq => {
-                numeric_operation!(self,
-                    pops { b:i64, a: i64 },
-                    push bool => a == b
-                );
-            }
-            Instruction::I64Ne => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push bool => a != b
-                );
-            }
-            Instruction::I64LtS => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push bool => a < b
-                );
-            }
-            Instruction::I64LtU => {
-                numeric_operation!(self,
-                    pops { b: u64, a: u64 },
-                    push bool => a < b
-                );
-            }
-            Instruction::I64GtS => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push bool => a > b
-                );
-            }
-            Instruction::I64GtU => {
-                numeric_operation!(self,
-                    pops { b: u64, a: u64 },
-                    push bool => a > b
-                );
-            }
-            Instruction::I64LeS => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push bool => a <= b
-                );
-            }
-            Instruction::I64LeU => {
-                numeric_operation!(self,
-                    pops { b: u64, a: u64 },
-                    push bool => a <= b
-                );
-            }
-            Instruction::I64GeS => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push bool => a >= b
-                );
-            }
-            Instruction::I64GeU => {
-                numeric_operation!(self,
-                    pops { b: u64, a: u64 },
-                    push bool => a >= b
-                );
-            }
-            Instruction::F32Eq => {
-                numeric_operation!(self,
-                    pops { b: f32, a: f32 },
-                    push bool => a == b
-                );
-            }
-            Instruction::F32Ne => {
-                numeric_operation!(self,
-                    pops { b: f32, a: f32 },
-                    push bool => a != b
-                );
-            }
-            Instruction::F32Lt => {
-                numeric_operation!(self,
-                    pops { b: f32, a: f32 },
-                    push bool => a < b
-                );
-            }
-            Instruction::F32Gt => {
-                numeric_operation!(self,
-                    pops { b: f32, a: f32 },
-                    push bool => a > b
-                );
-            }
-            Instruction::F32Le => {
-                numeric_operation!(self,
-                    pops { b: f32, a: f32 },
-                    push bool => a <= b
-                );
-            }
-            Instruction::F32Ge => {
-                numeric_operation!(self,
-                    pops { b: f32, a: f32 },
-                    push bool => a >= b
-                );
-            }
-            Instruction::I32Add => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push i32 => a.wrapping_add(b)
-                );
-            }
-            Instruction::I32Sub => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push i32 => a.wrapping_sub(b)
-                );
-            }
-            Instruction::I32Mul => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push i32 => a.wrapping_mul(b)
-                );
-            }
-            Instruction::I32DivS => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push i32 => a / b
-                );
-            }
-            Instruction::I32DivU => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push i32 => a / b
-                );
-            }
-            Instruction::I32RemS => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push i32 => a % b
-                );
-            }
-            Instruction::I32RemU => {
-                numeric_operation!(self,
-                    pops { b: u32, a: u32 },
-                    push u32 => a % b
-                );
-            }
-            Instruction::I32And => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push i32 => a & b
-                );
-            }
-            Instruction::I32Or => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push i32 => a | b
-                );
-            }
-            Instruction::I32Xor => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push i32 => a ^ b
-                );
-            }
-            Instruction::I32Shl => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push i32 => a << (b % 32)
-                );
-            }
-            Instruction::I32ShrS => {
-                numeric_operation!(self,
-                    pops { b: i32, a: i32 },
-                    push i32 => a >> (b % 32)
-                );
-            }
-            Instruction::I32ShrU => {
-                numeric_operation!(self,
-                    pops { b: u32, a: u32 },
-                    push u32 => a >> (b % 32)
-                );
-            }
-            Instruction::I32Rotr => {
-                numeric_operation!(self,
-                    pops { b: u32, a: u32 },
-                    push u32 => a.rotate_right(b)
-                );
-            }
-            Instruction::I32Rotl => {
-                numeric_operation!(self,
-                    pops { b: u32, a: u32 },
-                    push u32 => a.rotate_left(b)
-                );
-            }
-            Instruction::I64Add => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push i64 => a.wrapping_add(b)
-                );
-            }
-            Instruction::I64Sub => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push i64 => a.wrapping_sub(b)
-                );
-            }
-            Instruction::I64Mul => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push i64 => a.wrapping_mul(b)
-                );
-            }
-            Instruction::I64DivS => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push i64 => a / b
-                );
-            }
-            Instruction::I64RemS => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push i64 => a % b
-                );
-            }
-            Instruction::I64RemU => {
-                numeric_operation!(self,
-                    pops { b: u64, a: u64 },
-                    push u64 => a % b
-                );
-            }
-            Instruction::I64And => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push i64 => a & b
-                );
-            }
-            Instruction::I64Or => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push i64 => a | b
-                );
-            }
-            Instruction::I64Xor => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push i64 => a ^ b
-                );
-            }
-            Instruction::I64ShrS => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push i64 => a >> (b % 64)
-                );
-            }
-            Instruction::I64ShrU => {
-                numeric_operation!(self,
-                    pops { b: u64, a: u64 },
-                    push u64 => a >> (b % 64)
-                );
-            }
-            Instruction::I64Shl => {
-                numeric_operation!(self,
-                    pops { b: i64, a: i64 },
-                    push i64 => a << (b % 64)
-                );
-            }
-            Instruction::F32Abs => {
-                numeric_operation!(self,
-                    pops { a: f32 },
-                    push f32 => a.abs()
-                );
-            }
-            Instruction::F32Add => {
-                numeric_operation!(self,
-                    pops { b: f32, a: f32 },
-                    push f32 => a + b
-                );
-            }
-            Instruction::F32Sub => {
-                numeric_operation!(self,
-                    pops { b: f32, a: f32 },
-                    push f32 => a - b
-                );
-            }
-            Instruction::F32Mul => {
-                numeric_operation!(self,
-                    pops { b: f32, a: f32 },
-                    push f32 => a * b
-                );
-            }
-            Instruction::F32Div => {
-                numeric_operation!(self,
-                    pops { b: f32, a: f32 },
-                    push f32 => a / b
-                );
-            }
-            Instruction::F32Sqrt => {
-                numeric_operation!(self,
-                    pops { a: f32 },
-                    push f32 => a.sqrt()
-                );
-            }
-            Instruction::F32Copysign => {
-                numeric_operation!(self,
-                    pops { b: f32, a: f32 },
-                    push f32 => a .copysign(b)
-                );
-            }
-            Instruction::F64Add => {
-                numeric_operation!(self,
-                    pops { b: f64, a: f64 },
-                    push f64 => a + b
-                );
-            }
-            Instruction::F64Sub => {
-                numeric_operation!(self,
-                    pops { b: f64, a: f64 },
-                    push f64 => a - b
-                );
-            }
-            Instruction::F64Mul => {
-                numeric_operation!(self,
-                    pops { b: f64, a: f64 },
-                    push f64 => a * b
-                );
-            }
-            Instruction::F64Div => {
-                numeric_operation!(self,
-                    pops { b: f64, a: f64 },
-                    push f64 => a / b
-                );
-            }
-            Instruction::F64Neg => {
-                numeric_operation!(self,
-                    pops { a: f64 },
-                    push f64 => -a
-                );
-            }
-            Instruction::I32WrapI64 => {
-                numeric_operation!(self,
-                    pops { a: i64 },
-                    push i32 => a as i32
-                );
-            }
-            Instruction::I32TruncF32S => {
-                numeric_operation!(self,
-                    pops { a: f32 },
-                    push i32 => a as i32
-                );
-            }
-            Instruction::I32TruncF64S => {
-                numeric_operation!(self,
-                    pops { a: f64 },
-                    push i32 => a as i32
-                );
-            }
-            Instruction::I64ExtendI32S => {
-                numeric_operation!(self,
-                    pops { a: i32 },
-                    push i64 => a as i64
-                );
-            }
-            Instruction::I64ExtendI32U => {
-                numeric_operation!(self,
-                    pops { a: u32 },
-                    push u64 => a as u64
-                );
-            }
-            Instruction::I64TruncF32S => {
-                numeric_operation!(self,
-                    pops { a: f32 },
-                    push i64 => a as i64
-                );
-            }
-            Instruction::I64TruncF32U => {
-                numeric_operation!(self,
-                    pops { a: f32 },
-                    push u64 => a as u64
-                );
-            }
-            Instruction::I64TruncF64S => {
-                numeric_operation!(self,
-                    pops { a: f64 },
-                    push i64 => a as i64
-                );
-            }
-            Instruction::I64TruncF64U => {
-                numeric_operation!(self,
-                    pops { a: f64 },
-                    push u64 => a as u64
-                );
-            }
-            Instruction::F32DemoteF64 => {
-                numeric_operation!(self,
-                    pops { a: f64 },
-                    push f32 => a as f32
-                );
-            }
-            Instruction::F32ConvertI32S => {
-                numeric_operation!(self,
-                    pops { a: i32 },
-                    push f32 => a as f32
-                );
-            }
-            Instruction::F64ConvertI32S => {
-                numeric_operation!(self,
-                    pops { a: i32 },
-                    push f64 => a as f64
-                );
-            }
-            Instruction::F64ConvertI64U => {
-                numeric_operation!(self,
-                    pops { a: u64 },
-                    push f64 => a as f64
-                );
-            }
+            Instruction::I32Const(value) => self.stack.borrow_mut().push_i32(*value),
+            Instruction::I64Const(value) => self.stack.borrow_mut().push_i64(*value),
+            Instruction::F32Const(value) => self.stack.borrow_mut().push_f32(*value),
+            Instruction::F64Const(value) => self.stack.borrow_mut().push_f64(*value),
+
+            Instruction::I32Eqz => op!(self, { a: i32, }, bool => a == 0),
+            Instruction::I32Eq => op!(self, { b: i32, a: i32 }, bool => a == b),
+            Instruction::I32Ne => op!(self, { b: i32, a: i32 }, bool => a != b),
+            Instruction::I32LtS => op!(self, { b: i32, a: i32 }, bool => a < b),
+            Instruction::I32LtU => op!(self, { b: u32, a: u32 }, bool => a < b),
+            Instruction::I32GtS => op!(self, { b: i32, a: i32 }, bool => a > b),
+            Instruction::I32GtU => op!(self, { b: u32, a: u32 }, bool => a > b),
+            Instruction::I32LeS => op!(self, { b: i32, a: i32 }, bool => a <= b),
+            Instruction::I32LeU => op!(self, { b: u32, a: u32 }, bool => a <= b),
+            Instruction::I32GeS => op!(self, { b: i32, a: i32 }, bool => a >= b),
+            Instruction::I32GeU => op!(self, { b: u32, a: u32 }, bool => a >= b),
+            Instruction::I64Eqz => op!(self, { a: i64 }, bool => a == 0),
+            Instruction::I64Eq => op!(self, { b:i64, a: i64 }, bool => a == b),
+            Instruction::I64Ne => op!(self, { b: i64, a: i64 }, bool => a != b),
+            Instruction::I64LtS => op!(self, { b: i64, a: i64 }, bool => a < b),
+            Instruction::I64LtU => op!(self, { b: u64, a: u64 }, bool => a < b),
+            Instruction::I64GtS => op!(self, { b: i64, a: i64 }, bool => a > b),
+            Instruction::I64GtU => op!(self, { b: u64, a: u64 }, bool => a > b),
+            Instruction::I64LeS => op!(self, { b: i64, a: i64 }, bool => a <= b),
+            Instruction::I64LeU => op!(self, { b: u64, a: u64 }, bool => a <= b),
+            Instruction::I64GeS => op!(self, { b: i64, a: i64 }, bool => a >= b),
+            Instruction::I64GeU => op!(self, { b: u64, a: u64 }, bool => a >= b),
+            Instruction::F32Eq => op!(self, { b: f32, a: f32 }, bool => a == b),
+            Instruction::F32Ne => op!(self, { b: f32, a: f32 }, bool => a != b),
+            Instruction::F32Lt => op!(self, { b: f32, a: f32 }, bool => a < b),
+            Instruction::F32Gt => op!(self, { b: f32, a: f32 }, bool => a > b),
+            Instruction::F32Le => op!(self, { b: f32, a: f32 }, bool => a <= b),
+            Instruction::F32Ge => op!(self, { b: f32, a: f32 }, bool => a >= b),
+            Instruction::I32Add => op!(self, { b: i32, a: i32 }, i32 => a.wrapping_add(b)),
+            Instruction::I32Sub => op!(self, { b: i32, a: i32 }, i32 => a.wrapping_sub(b)),
+            Instruction::I32Mul => op!(self, { b: i32, a: i32 }, i32 => a.wrapping_mul(b)),
+            Instruction::I32DivS => op!(self, { b: i32, a: i32 }, i32 => a / b),
+            Instruction::I32DivU => op!(self, { b: u32, a: u32 }, u32 => a / b),
+            Instruction::I32RemS => op!(self, { b: i32, a: i32 }, i32 => a % b),
+            Instruction::I32RemU => op!(self, { b: u32, a: u32 }, u32 => a % b),
+            Instruction::I32And => op!(self, { b: i32, a: i32 }, i32 => a & b),
+            Instruction::I32Or => op!(self, { b: i32, a: i32 }, i32 => a | b),
+            Instruction::I32Xor => op!(self, { b: i32, a: i32 }, i32 => a ^ b),
+            Instruction::I32Shl => op!(self, { b: i32, a: i32 }, i32 => a << (b % 32)),
+            Instruction::I32ShrS => op!(self, { b: i32, a: i32 }, i32 => a >> (b % 32)),
+            Instruction::I32ShrU => op!(self, { b: u32, a: u32 }, u32 => a >> (b % 32)),
+            Instruction::I32Rotr => op!(self, { b: u32, a: u32 }, u32 => a.rotate_right(b)),
+            Instruction::I32Rotl => op!(self, { b: u32, a: u32 }, u32 => a.rotate_left(b)),
+            Instruction::I64Add => op!(self, { b: i64, a: i64 }, i64 => a.wrapping_add(b)),
+            Instruction::I64Sub => op!(self, { b: i64, a: i64 }, i64 => a.wrapping_sub(b)),
+            Instruction::I64Mul => op!(self, { b: i64, a: i64 }, i64 => a.wrapping_mul(b)),
+            Instruction::I64DivS => op!(self, { b: i64, a: i64 }, i64 => a / b),
+            Instruction::I64RemS => op!(self, { b: i64, a: i64 }, i64 => a % b),
+            Instruction::I64RemU => op!(self, { b: u64, a: u64 }, u64 => a % b),
+            Instruction::I64And => op!(self, { b: i64, a: i64 }, i64 => a & b),
+            Instruction::I64Or => op!(self, { b: i64, a: i64 }, i64 => a | b),
+            Instruction::I64Xor => op!(self, { b: i64, a: i64 }, i64 => a ^ b),
+            Instruction::I64ShrS => op!(self, { b: i64, a: i64 }, i64 => a >> (b % 64)),
+            Instruction::I64ShrU => op!(self, { b: u64, a: u64 }, u64 => a >> (b % 64)),
+            Instruction::I64Shl => op!(self, { b: i64, a: i64 }, i64 => a << (b % 64)),
+            Instruction::F32Abs => op!(self, { a: f32 }, f32 => a.abs()),
+            Instruction::F32Add => op!(self, { b: f32, a: f32 }, f32 => a + b),
+            Instruction::F32Sub => op!(self, { b: f32, a: f32 }, f32 => a - b),
+            Instruction::F32Mul => op!(self, { b: f32, a: f32 }, f32 => a * b),
+            Instruction::F32Div => op!(self, { b: f32, a: f32 }, f32 => a / b),
+            Instruction::F32Sqrt => op!(self, { a: f32 }, f32 => a.sqrt()),
+            Instruction::F32Copysign => op!(self, { b: f32, a: f32 }, f32 => a .copysign(b)),
+            Instruction::F64Add => op!(self, { b: f64, a: f64 }, f64 => a + b),
+            Instruction::F64Sub => op!(self, { b: f64, a: f64 }, f64 => a - b),
+            Instruction::F64Mul => op!(self, { b: f64, a: f64 }, f64 => a * b),
+            Instruction::F64Div => op!(self, { b: f64, a: f64 }, f64 => a / b),
+            Instruction::F64Neg => op!(self, { a: f64 }, f64 => -a),
+            Instruction::I32WrapI64 => op!(self, { a: i64 }, i32 => a as i32),
+            Instruction::I32TruncF32S => op!(self, { a: f32 }, i32 => a as i32),
+            Instruction::I32TruncF64S => op!(self, { a: f64 }, i32 => a as i32),
+            Instruction::I64ExtendI32S => op!(self, { a: i32 }, i64 => a as i64),
+            Instruction::I64ExtendI32U => op!(self, { a: u32 }, u64 => a as u64),
+            Instruction::I64TruncF32S => op!(self, { a: f32 }, i64 => a as i64),
+            Instruction::I64TruncF32U => op!(self, { a: f32 }, u64 => a as u64),
+            Instruction::I64TruncF64S => op!(self, { a: f64 }, i64 => a as i64),
+            Instruction::I64TruncF64U => op!(self, { a: f64 }, u64 => a as u64),
+            Instruction::F32DemoteF64 => op!(self, { a: f64 }, f32 => a as f32),
+            Instruction::F32ConvertI32S => op!(self, { a: i32 }, f32 => a as f32),
+            Instruction::F64ConvertI32S => op!(self, { a: i32 }, f64 => a as f64),
+            Instruction::F64ConvertI64U => op!(self, { a: u64 }, f64 => a as f64),
             Instruction::I32ReinterpretF32 => {
-                numeric_operation!(self,
-                    pops { a: f32 },
-                    push i32 => i32::from_le_bytes(a.to_le_bytes())
-                );
+                op!(self, { a: f32 }, i32 => i32::from_le_bytes(a.to_le_bytes()))
             }
             Instruction::F32ReinterpretI32 => {
-                numeric_operation!(self,
-                    pops { a: i32 },
-                    push f32 => f32::from_le_bytes(a.to_le_bytes())
-                );
+                op!(self, { a: i32 }, f32 => f32::from_le_bytes(a.to_le_bytes()))
             }
             Instruction::F64ReinterpretI64 => {
-                numeric_operation!(self,
-                    pops { a: i64 },
-                    push f64 => f64::from_le_bytes(a.to_le_bytes())
-                );
+                op!(self, { a: i64 }, f64 => f64::from_le_bytes(a.to_le_bytes()))
             }
-            Instruction::I32Extend16S => {
-                numeric_operation!(self,
-                    pops { a: i32 },
-                    push i32 => (a & 0xFFFF) as i16 as i32
-                );
-            }
+            Instruction::I32Extend16S => op!(self, { a: i32 }, i32 => (a & 0xFFFF) as i16 as i32),
 
             Instruction::PushFuncRef(func) => self.stack.borrow_mut().push_ref(Some(*func)),
+
             Instruction::Memcpy => {
                 let len = self.stack.borrow_mut().pop_u32() as usize;
                 let src = self.stack.borrow_mut().pop_u32() as usize;
