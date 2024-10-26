@@ -9,7 +9,7 @@ use crate::{
         functions::{Function, LocalFunction},
         Module,
     },
-    types::{BlockIdx, ElementMode, FuncIdx, Instruction, ValueType},
+    types::{BlockIdx, DataMode, ElementMode, FuncIdx, Instruction, ValueType},
     wasi::Wasi,
 };
 
@@ -643,6 +643,20 @@ impl<'a> Runtime<'a> {
 
             Instruction::PushFuncRef(func) => self.stack.borrow_mut().push_ref(Some(*func)),
 
+            Instruction::MemoryInit(data_idx) => {
+                let module = self.module.borrow();
+                let data = &module.datas()[data_idx.0 as usize];
+                assert!(
+                    matches!(data.mode, DataMode::Passive),
+                    "Can only init passive data"
+                );
+                let len = self.stack.borrow_mut().pop_u32() as usize;
+                let src = self.stack.borrow_mut().pop_u32() as usize;
+                let dst = self.stack.borrow_mut().pop_u32();
+                let data = &data.init[src..src + len];
+                self.memory.borrow_mut().fill_data(dst, data);
+            }
+            Instruction::DataDrop(_) => {}
             Instruction::Memcpy => {
                 let len = self.stack.borrow_mut().pop_u32() as usize;
                 let src = self.stack.borrow_mut().pop_u32() as usize;

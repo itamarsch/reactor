@@ -5,7 +5,9 @@ use std::{
     process::exit,
 };
 
-use nom::{multi::count, number::complete::le_u32, sequence::pair, IResult, Parser};
+use nom::{
+    combinator::cut, multi::count, number::complete::le_u32, sequence::pair, IResult, Parser,
+};
 mod error;
 
 use crate::runtime::{memory::Memory, stack::Stack};
@@ -56,7 +58,7 @@ impl Wasi {
 
                 let (_, iovs) =
                     count(
-                        IOVec::parse.map(|iov| IoSlice::new(memory.get_range(iov.as_range()))),
+                        cut(IOVec::parse.map(|iov| IoSlice::new(memory.get_range(iov.as_range())))),
                         amount_of_iovs,
                     )(memory.get_range(iov_addr..iov_addr + amount_of_iovs * 8))
                     .unwrap();
