@@ -56,7 +56,7 @@ impl Board {
             for num in 1..=9 {
                 if self.is_valid(row, col, num) {
                     self.grid[row][col] = num;
-                    self.print_board();
+                    // self.print_board();
 
                     if self.solve() {
                         return true;
@@ -74,7 +74,7 @@ impl Board {
 
     fn print_board(&self) {
         // Move cursor to 0,0
-        print!("\x1b[H");
+        // print!("\x1b[H");
 
         for r in 0..9 {
             if r % 3 == 0 && r != 0 {
@@ -99,17 +99,17 @@ impl Board {
 fn main() {
     // Initial board (0 represents empty cells)
     let initial_grid = [
-        [5, 3, 0, 0, 7, 0, 0, 0, 0],
-        [6, 0, 0, 1, 9, 5, 0, 0, 0],
-        [0, 9, 8, 0, 0, 0, 0, 6, 0],
+        [0, 9, 6, 0, 0, 2, 0, 0, 0],
+        [0, 0, 0, 0, 7, 0, 0, 0, 6],
+        [0, 0, 3, 0, 0, 0, 0, 0, 4],
         //
-        [8, 0, 0, 0, 6, 0, 0, 0, 3],
-        [4, 0, 0, 8, 0, 3, 0, 0, 1],
-        [7, 0, 0, 0, 2, 0, 0, 0, 6],
+        [0, 3, 0, 8, 0, 4, 0, 0, 0],
+        [0, 0, 0, 5, 0, 0, 0, 0, 1],
+        [0, 2, 0, 0, 0, 3, 5, 0, 0],
         //
-        [0, 6, 0, 0, 0, 0, 2, 8, 0],
-        [0, 0, 0, 4, 1, 9, 0, 0, 5],
-        [0, 0, 0, 0, 8, 0, 0, 7, 9],
+        [0, 0, 0, 0, 0, 8, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0, 7, 0, 0],
+        [0, 0, 4, 6, 0, 1, 9, 0, 8],
     ];
 
     let mut board = Board::new(initial_grid);
@@ -121,4 +121,5 @@ fn main() {
     } else {
         println!("No solution exists.");
     }
+    board.print_board();
 }

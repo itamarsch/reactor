@@ -168,4 +168,10 @@ impl Memory {
     pub fn size(&self) -> u32 {
         (self.data.len() / PAGE_SIZE) as u32
     }
+
+    pub fn fill_value(&mut self, len: usize, addr: usize, value: u8) {
+        for i in addr..addr + len {
+            self.data[i] = value;
+        }
+    }
 }

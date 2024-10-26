@@ -703,6 +703,42 @@ impl<'a> Runtime<'a> {
                     push bool => a >= b
                 );
             }
+            Instruction::F32Eq => {
+                numeric_operation!(self,
+                    pops { b: f32, a: f32 },
+                    push bool => a == b
+                );
+            }
+            Instruction::F32Ne => {
+                numeric_operation!(self,
+                    pops { b: f32, a: f32 },
+                    push bool => a != b
+                );
+            }
+            Instruction::F32Lt => {
+                numeric_operation!(self,
+                    pops { b: f32, a: f32 },
+                    push bool => a < b
+                );
+            }
+            Instruction::F32Gt => {
+                numeric_operation!(self,
+                    pops { b: f32, a: f32 },
+                    push bool => a > b
+                );
+            }
+            Instruction::F32Le => {
+                numeric_operation!(self,
+                    pops { b: f32, a: f32 },
+                    push bool => a <= b
+                );
+            }
+            Instruction::F32Ge => {
+                numeric_operation!(self,
+                    pops { b: f32, a: f32 },
+                    push bool => a >= b
+                );
+            }
             Instruction::I32Add => {
                 numeric_operation!(self,
                     pops { b: i32, a: i32 },
@@ -781,6 +817,18 @@ impl<'a> Runtime<'a> {
                     push u32 => a >> (b % 32)
                 );
             }
+            Instruction::I32Rotr => {
+                numeric_operation!(self,
+                    pops { b: u32, a: u32 },
+                    push u32 => a.rotate_right(b)
+                );
+            }
+            Instruction::I32Rotl => {
+                numeric_operation!(self,
+                    pops { b: u32, a: u32 },
+                    push u32 => a.rotate_left(b)
+                );
+            }
             Instruction::I64Add => {
                 numeric_operation!(self,
                     pops { b: i64, a: i64 },
@@ -817,10 +865,22 @@ impl<'a> Runtime<'a> {
                     push u64 => a % b
                 );
             }
+            Instruction::I64And => {
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push i64 => a & b
+                );
+            }
             Instruction::I64Or => {
                 numeric_operation!(self,
                     pops { b: i64, a: i64 },
                     push i64 => a | b
+                );
+            }
+            Instruction::I64Xor => {
+                numeric_operation!(self,
+                    pops { b: i64, a: i64 },
+                    push i64 => a ^ b
                 );
             }
             Instruction::I64ShrS => {
@@ -839,6 +899,12 @@ impl<'a> Runtime<'a> {
                 numeric_operation!(self,
                     pops { b: i64, a: i64 },
                     push i64 => a << (b % 64)
+                );
+            }
+            Instruction::F32Abs => {
+                numeric_operation!(self,
+                    pops { a: f32 },
+                    push f32 => a.abs()
                 );
             }
             Instruction::F32Add => {
@@ -871,6 +937,12 @@ impl<'a> Runtime<'a> {
                     push f32 => a.sqrt()
                 );
             }
+            Instruction::F32Copysign => {
+                numeric_operation!(self,
+                    pops { b: f32, a: f32 },
+                    push f32 => a .copysign(b)
+                );
+            }
             Instruction::F64Add => {
                 numeric_operation!(self,
                     pops { b: f64, a: f64 },
@@ -893,6 +965,12 @@ impl<'a> Runtime<'a> {
                 numeric_operation!(self,
                     pops { b: f64, a: f64 },
                     push f64 => a / b
+                );
+            }
+            Instruction::F64Neg => {
+                numeric_operation!(self,
+                    pops { a: f64 },
+                    push f64 => -a
                 );
             }
             Instruction::I32WrapI64 => {
@@ -949,6 +1027,12 @@ impl<'a> Runtime<'a> {
                     push u64 => a as u64
                 );
             }
+            Instruction::F32DemoteF64 => {
+                numeric_operation!(self,
+                    pops { a: f64 },
+                    push f32 => a as f32
+                );
+            }
             Instruction::F32ConvertI32S => {
                 numeric_operation!(self,
                     pops { a: i32 },
@@ -961,14 +1045,50 @@ impl<'a> Runtime<'a> {
                     push f64 => a as f64
                 );
             }
+            Instruction::F64ConvertI64U => {
+                numeric_operation!(self,
+                    pops { a: u64 },
+                    push f64 => a as f64
+                );
+            }
+            Instruction::I32ReinterpretF32 => {
+                numeric_operation!(self,
+                    pops { a: f32 },
+                    push i32 => i32::from_le_bytes(a.to_le_bytes())
+                );
+            }
+            Instruction::F32ReinterpretI32 => {
+                numeric_operation!(self,
+                    pops { a: i32 },
+                    push f32 => f32::from_le_bytes(a.to_le_bytes())
+                );
+            }
+            Instruction::F64ReinterpretI64 => {
+                numeric_operation!(self,
+                    pops { a: i64 },
+                    push f64 => f64::from_le_bytes(a.to_le_bytes())
+                );
+            }
+            Instruction::I32Extend16S => {
+                numeric_operation!(self,
+                    pops { a: i32 },
+                    push i32 => (a & 0xFFFF) as i16 as i32
+                );
+            }
+
+            Instruction::PushFuncRef(func) => self.stack.borrow_mut().push_ref(Some(*func)),
             Instruction::Memcpy => {
                 let len = self.stack.borrow_mut().pop_u32() as usize;
                 let src = self.stack.borrow_mut().pop_u32() as usize;
                 let dst = self.stack.borrow_mut().pop_u32() as usize;
                 self.memory.borrow_mut().cpy(src, dst, len);
             }
-
-            Instruction::PushFuncRef(func) => self.stack.borrow_mut().push_ref(Some(*func)),
+            Instruction::Memfill => {
+                let len = self.stack.borrow_mut().pop_u32() as usize;
+                let value = self.stack.borrow_mut().pop_u32() as u8;
+                let addr = self.stack.borrow_mut().pop_u32() as usize;
+                self.memory.borrow_mut().fill_value(len, addr, value);
+            }
             _ => panic!("Instruction: {:?} not implemented ", instruction,),
         }
     }
