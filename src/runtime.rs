@@ -451,6 +451,13 @@ impl<'a, 'b> Runtime<'b, 'a> {
 
                 self.call_function(func_idx);
             }
+            Instruction::PushNullRef(_) => self.stack.borrow_mut().push_ref(None),
+            Instruction::RefIsNull => self
+                .stack
+                .borrow_mut()
+                .push_bool(self.stack.borrow_mut().pop_ref().is_none()),
+            Instruction::PushFuncRef(func) => self.stack.borrow_mut().push_ref(Some(*func)),
+
             Instruction::Drop => {
                 self.stack.borrow_mut().drop_value();
             }
@@ -464,6 +471,8 @@ impl<'a, 'b> Runtime<'b, 'a> {
                     false_value
                 });
             }
+            Instruction::SelectTyped(_) => todo!(),
+
             Instruction::LocalGet(idx) => {
                 let value = self.current_function_state.borrow().get_local_value(*idx);
                 self.stack.borrow_mut().push_value(value);
@@ -481,7 +490,6 @@ impl<'a, 'b> Runtime<'b, 'a> {
                     .set_local_value(*idx, value);
                 self.stack.borrow_mut().push_value(value);
             }
-
             Instruction::GlobalGet(idx) => {
                 let value = self.globals.borrow().get(*idx);
                 self.stack.borrow_mut().push_value(value);
@@ -490,6 +498,7 @@ impl<'a, 'b> Runtime<'b, 'a> {
                 let value = self.stack.borrow_mut().pop_value();
                 self.globals.borrow_mut().set(value, *idx);
             }
+
             Instruction::TableGet(table_idx) => {
                 let index_in_table = self.stack.borrow_mut().pop_table_element_idx();
                 let tables = self.tables.borrow();
@@ -497,7 +506,6 @@ impl<'a, 'b> Runtime<'b, 'a> {
 
                 self.stack.borrow_mut().push_ref(ref_value);
             }
-
             Instruction::TableSet(table_idx) => {
                 let ref_value = self.stack.borrow_mut().pop_ref();
                 let index_in_table = self.stack.borrow_mut().pop_table_element_idx();
@@ -506,35 +514,74 @@ impl<'a, 'b> Runtime<'b, 'a> {
                     .table_mut(*table_idx)
                     .set(index_in_table, ref_value);
             }
+            Instruction::TableInit(element_idx, table_idx) => {
+                let elem = &self.module.elements()[element_idx.0 as usize];
+                let len = self.stack.borrow_mut().pop_u32() as usize;
+                let src = self.stack.borrow_mut().pop_u32() as usize;
+                let dst = self.stack.borrow_mut().pop_u32() as usize;
+                let inits = elem.init[src..src + len]
+                    .iter()
+                    .map(|init| self.run_expr(*init, || self.stack.borrow_mut().pop_ref()));
+                let mut tables = self.tables.borrow_mut();
+                let table = tables.table_mut(*table_idx);
+                for (i, func_ref) in inits.enumerate() {
+                    table.set(TableElementIdx(i + dst), func_ref);
+                }
+            }
+            Instruction::ElementDrop(_) => {}
+            Instruction::TableCopy(dst_idx, src_idx) => {
+                let len = self.stack.borrow_mut().pop_u32() as usize;
+                let src_offset = self.stack.borrow_mut().pop_table_element_idx();
+                let dst_offset = self.stack.borrow_mut().pop_table_element_idx();
+                self.tables
+                    .borrow_mut()
+                    .copy(*dst_idx, *src_idx, dst_offset, src_offset, len);
+            }
+            Instruction::TableGrow(table) => {
+                let mut tables = self.tables.borrow_mut();
+                let table = tables.table_mut(*table);
+                let len = self.stack.borrow_mut().pop_u32() as usize;
+                let val = self.stack.borrow_mut().pop_ref();
+                let size = table.grow(len, val);
+                self.stack.borrow_mut().push_u32(size as u32);
+            }
+            Instruction::TableFill(table_idx) => {
+                let mut tables = self.tables.borrow_mut();
+                let table = tables.table_mut(*table_idx);
+                let len = self.stack.borrow_mut().pop_u32() as usize;
+                let val = self.stack.borrow_mut().pop_ref();
+                let offset = self.stack.borrow_mut().pop_table_element_idx();
+                table.fill_value(offset, val, len);
+            }
+            Instruction::TableSize(table_idx) => {
+                let tables = self.tables.borrow();
+                let table = tables.table(*table_idx);
+                self.stack.borrow_mut().push_u32(table.size() as u32);
+            }
 
             Instruction::I32Load(memarg) => memory_load!(self, i32, load_i32, memarg),
             Instruction::I64Load(memarg) => memory_load!(self, i64, load_i64, memarg),
             Instruction::F32Load(memarg) => memory_load!(self, f32, load_f32, memarg),
             Instruction::F64Load(memarg) => memory_load!(self, f64, load_f64, memarg),
-
             Instruction::I32Load8S(memarg) => memory_load!(self, i32, load_i32_8, memarg),
             Instruction::I32Load8U(memarg) => memory_load!(self, u32, load_u32_8, memarg),
             Instruction::I32Load16S(memarg) => memory_load!(self, i32, load_i32_16, memarg),
             Instruction::I32Load16U(memarg) => memory_load!(self, u32, load_u32_16, memarg),
-
             Instruction::I64Load8S(memarg) => memory_load!(self, i64, load_i64_8, memarg),
             Instruction::I64Load8U(memarg) => memory_load!(self, u64, load_u64_8, memarg),
             Instruction::I64Load16S(memarg) => memory_load!(self, i64, load_i64_16, memarg),
             Instruction::I64Load16U(memarg) => memory_load!(self, u64, load_u64_16, memarg),
             Instruction::I64Load32S(memarg) => memory_load!(self, i64, load_i64_32, memarg),
             Instruction::I64Load32U(memarg) => memory_load!(self, u64, load_u64_32, memarg),
-
             Instruction::I32Store(memarg) => memory_store!(self, i32, store_i32, memarg),
             Instruction::I64Store(memarg) => memory_store!(self, i64, store_i64, memarg),
             Instruction::F32Store(memarg) => memory_store!(self, f32, store_f32, memarg),
             Instruction::F64Store(memarg) => memory_store!(self, f64, store_f64, memarg),
-
             Instruction::I32Store8(memarg) => memory_store!(self, i32, store_i32_8, memarg),
             Instruction::I32Store16(memarg) => memory_store!(self, i32, store_i32_16, memarg),
             Instruction::I64Store8(memarg) => memory_store!(self, i64, store_i64_8, memarg),
             Instruction::I64Store16(memarg) => memory_store!(self, i64, store_i64_16, memarg),
             Instruction::I64Store32(memarg) => memory_store!(self, i64, store_i64_32, memarg),
-
             Instruction::MemorySize => self
                 .stack
                 .borrow_mut()
@@ -544,6 +591,31 @@ impl<'a, 'b> Runtime<'b, 'a> {
                 self.stack
                     .borrow_mut()
                     .push_i32(self.memory.borrow_mut().grow(delta));
+            }
+            Instruction::MemoryInit(data_idx) => {
+                let data = &self.module.datas()[data_idx.0 as usize];
+                assert!(
+                    matches!(data.mode, DataMode::Passive),
+                    "Can only init passive data"
+                );
+                let len = self.stack.borrow_mut().pop_u32() as usize;
+                let src = self.stack.borrow_mut().pop_u32() as usize;
+                let dst = self.stack.borrow_mut().pop_u32();
+                let data = &data.init[src..src + len];
+                self.memory.borrow_mut().fill_data(dst, data);
+            }
+            Instruction::DataDrop(_) => {}
+            Instruction::Memcpy => {
+                let len = self.stack.borrow_mut().pop_u32() as usize;
+                let src = self.stack.borrow_mut().pop_u32() as usize;
+                let dst = self.stack.borrow_mut().pop_u32() as usize;
+                self.memory.borrow_mut().cpy(src, dst, len);
+            }
+            Instruction::Memfill => {
+                let len = self.stack.borrow_mut().pop_u32() as usize;
+                let value = self.stack.borrow_mut().pop_u32() as u8;
+                let addr = self.stack.borrow_mut().pop_u32() as usize;
+                self.memory.borrow_mut().fill_value(len, addr, value);
             }
 
             Instruction::I32Const(value) => self.stack.borrow_mut().push_i32(*value),
@@ -579,6 +651,18 @@ impl<'a, 'b> Runtime<'b, 'a> {
             Instruction::F32Gt => op!(self, { b: f32, a: f32 }, bool => a > b),
             Instruction::F32Le => op!(self, { b: f32, a: f32 }, bool => a <= b),
             Instruction::F32Ge => op!(self, { b: f32, a: f32 }, bool => a >= b),
+
+            Instruction::F64Eq => op!(self, { b: f64, a: f64 }, bool => a == b),
+            Instruction::F64Ne => op!(self, { b: f64, a: f64 }, bool => a != b),
+            Instruction::F64Lt => op!(self, { b: f64, a: f64 }, bool => a < b),
+            Instruction::F64Gt => op!(self, { b: f64, a: f64 }, bool => a > b),
+            Instruction::F64Le => op!(self, { b: f64, a: f64 }, bool => a <= b),
+            Instruction::F64Ge => op!(self, { b: f64, a: f64 }, bool => a >= b),
+
+            Instruction::I32Clz => op!(self, { a: u32 }, u32 => a.leading_zeros()),
+            Instruction::I32Ctz => op!(self, { a: u32 }, u32 => a.trailing_zeros()),
+            Instruction::I32Popcnt => op!(self, { a: u32 }, u32 => a.count_ones()),
+
             Instruction::I32Add => op!(self, { b: i32, a: i32 }, i32 => a.wrapping_add(b)),
             Instruction::I32Sub => op!(self, { b: i32, a: i32 }, i32 => a.wrapping_sub(b)),
             Instruction::I32Mul => op!(self, { b: i32, a: i32 }, i32 => a.wrapping_mul(b)),
@@ -594,45 +678,80 @@ impl<'a, 'b> Runtime<'b, 'a> {
             Instruction::I32ShrU => op!(self, { b: u32, a: u32 }, u32 => a >> (b % 32)),
             Instruction::I32Rotr => op!(self, { b: u32, a: u32 }, u32 => a.rotate_right(b)),
             Instruction::I32Rotl => op!(self, { b: u32, a: u32 }, u32 => a.rotate_left(b)),
+
+            Instruction::I64Clz => op!(self, { a: u64 }, u64 => a.leading_zeros() as u64),
+            Instruction::I64Ctz => op!(self, { a: u64 }, u64 => a.trailing_zeros() as u64),
+            Instruction::I64Popcnt => op!(self, { a: u64 }, u64 => a.count_ones() as u64),
             Instruction::I64Add => op!(self, { b: i64, a: i64 }, i64 => a.wrapping_add(b)),
             Instruction::I64Sub => op!(self, { b: i64, a: i64 }, i64 => a.wrapping_sub(b)),
             Instruction::I64Mul => op!(self, { b: i64, a: i64 }, i64 => a.wrapping_mul(b)),
             Instruction::I64DivS => op!(self, { b: i64, a: i64 }, i64 => a / b),
+            Instruction::I64DivU => op!(self, { b: u64, a: u64 }, u64 => a / b),
             Instruction::I64RemS => op!(self, { b: i64, a: i64 }, i64 => a % b),
             Instruction::I64RemU => op!(self, { b: u64, a: u64 }, u64 => a % b),
             Instruction::I64And => op!(self, { b: i64, a: i64 }, i64 => a & b),
             Instruction::I64Or => op!(self, { b: i64, a: i64 }, i64 => a | b),
             Instruction::I64Xor => op!(self, { b: i64, a: i64 }, i64 => a ^ b),
+            Instruction::I64Shl => op!(self, { b: i64, a: i64 }, i64 => a << (b % 64)),
             Instruction::I64ShrS => op!(self, { b: i64, a: i64 }, i64 => a >> (b % 64)),
             Instruction::I64ShrU => op!(self, { b: u64, a: u64 }, u64 => a >> (b % 64)),
-            Instruction::I64Shl => op!(self, { b: i64, a: i64 }, i64 => a << (b % 64)),
+            Instruction::I64Rotl => op!(self, { b: u64, a: u64 }, u64 => a.rotate_left(b as u32)),
+            Instruction::I64Rotr => op!(self, { b: u64, a: u64 }, u64 => a.rotate_right(b as u32)),
+
             Instruction::F32Abs => op!(self, { a: f32 }, f32 => a.abs()),
+            Instruction::F32Neg => op!(self, { a: f32 }, f32 => -a),
+            Instruction::F32Ceil => op!(self, { a: f32 }, f32 => a.ceil()),
+            Instruction::F32Floor => op!(self, { a: f32 }, f32 => a.floor()),
+            Instruction::F32Trunc => op!(self, { a: f32 }, f32 => a.trunc()),
+            Instruction::F32Nearest => op!(self, { a: f32 }, f32 => a.round()),
+            Instruction::F32Sqrt => op!(self, { a: f32 }, f32 => a.sqrt()),
             Instruction::F32Add => op!(self, { b: f32, a: f32 }, f32 => a + b),
             Instruction::F32Sub => op!(self, { b: f32, a: f32 }, f32 => a - b),
             Instruction::F32Mul => op!(self, { b: f32, a: f32 }, f32 => a * b),
             Instruction::F32Div => op!(self, { b: f32, a: f32 }, f32 => a / b),
-            Instruction::F32Sqrt => op!(self, { a: f32 }, f32 => a.sqrt()),
+            Instruction::F32Min => op!(self, { b: f32, a: f32 }, f32 => a.min(b)),
+            Instruction::F32Max => op!(self, { b: f32, a: f32 }, f32 => a.max(b)),
             Instruction::F32Copysign => op!(self, { b: f32, a: f32 }, f32 => a .copysign(b)),
+            Instruction::F64Abs => op!(self, { a: f64 }, f64 => a.abs()),
+            Instruction::F64Neg => op!(self, { a: f64 }, f64 => -a),
+            Instruction::F64Ceil => op!(self, { a: f64 }, f64 => a.ceil()),
+            Instruction::F64Floor => op!(self, { a: f64 }, f64 => a.floor()),
+            Instruction::F64Trunc => op!(self, { a: f64 }, f64 => a.trunc()),
+            Instruction::F64Nearest => op!(self, { a: f64 }, f64 => a.round()),
+            Instruction::F64Sqrt => op!(self, { a: f64 }, f64 => a.sqrt()),
             Instruction::F64Add => op!(self, { b: f64, a: f64 }, f64 => a + b),
             Instruction::F64Sub => op!(self, { b: f64, a: f64 }, f64 => a - b),
             Instruction::F64Mul => op!(self, { b: f64, a: f64 }, f64 => a * b),
             Instruction::F64Div => op!(self, { b: f64, a: f64 }, f64 => a / b),
-            Instruction::F64Neg => op!(self, { a: f64 }, f64 => -a),
+            Instruction::F64Min => op!(self, { b: f64, a: f64 }, f64 => a.min(b)),
+            Instruction::F64Max => op!(self, { b: f64, a: f64 }, f64 => a.max(b)),
+            Instruction::F64Copysign => op!(self, { b: f64, a: f64 }, f64 => a .copysign(b)),
             Instruction::I32WrapI64 => op!(self, { a: i64 }, i32 => a as i32),
             Instruction::I32TruncF32S => op!(self, { a: f32 }, i32 => a as i32),
+            Instruction::I32TruncF32U => op!(self, { a: f32 }, u32 => a as u32),
             Instruction::I32TruncF64S => op!(self, { a: f64 }, i32 => a as i32),
+            Instruction::I32TruncF64U => op!(self, { a: f64 }, u32 => a as u32),
             Instruction::I64ExtendI32S => op!(self, { a: i32 }, i64 => a as i64),
             Instruction::I64ExtendI32U => op!(self, { a: u32 }, u64 => a as u64),
             Instruction::I64TruncF32S => op!(self, { a: f32 }, i64 => a as i64),
             Instruction::I64TruncF32U => op!(self, { a: f32 }, u64 => a as u64),
             Instruction::I64TruncF64S => op!(self, { a: f64 }, i64 => a as i64),
             Instruction::I64TruncF64U => op!(self, { a: f64 }, u64 => a as u64),
-            Instruction::F32DemoteF64 => op!(self, { a: f64 }, f32 => a as f32),
             Instruction::F32ConvertI32S => op!(self, { a: i32 }, f32 => a as f32),
+            Instruction::F32ConvertI32U => op!(self, { a: u32 }, f32 => a as f32),
+            Instruction::F32ConvertI64S => op!(self, { a: i64 }, f32 => a as f32),
+            Instruction::F32ConvertI64U => op!(self, { a: u64 }, f32 => a as f32),
+            Instruction::F32DemoteF64 => op!(self, { a: f64 }, f32 => a as f32),
             Instruction::F64ConvertI32S => op!(self, { a: i32 }, f64 => a as f64),
+            Instruction::F64ConvertI32U => op!(self, { a: u32 }, f64 => a as f64),
+            Instruction::F64ConvertI64S => op!(self, { a: i64 }, f64 => a as f64),
             Instruction::F64ConvertI64U => op!(self, { a: u64 }, f64 => a as f64),
+            Instruction::F64PromoteF32 => op!(self, { a: f32 }, f64 => a as f64),
             Instruction::I32ReinterpretF32 => {
                 op!(self, { a: f32 }, i32 => i32::from_le_bytes(a.to_le_bytes()))
+            }
+            Instruction::I64ReinterpretF64 => {
+                op!(self, { a: f64 }, i64 => i64::from_le_bytes(a.to_le_bytes()))
             }
             Instruction::F32ReinterpretI32 => {
                 op!(self, { a: i32 }, f32 => f32::from_le_bytes(a.to_le_bytes()))
@@ -640,52 +759,31 @@ impl<'a, 'b> Runtime<'b, 'a> {
             Instruction::F64ReinterpretI64 => {
                 op!(self, { a: i64 }, f64 => f64::from_le_bytes(a.to_le_bytes()))
             }
-            Instruction::I32Extend16S => op!(self, { a: i32 }, i32 => (a & 0xFFFF) as i16 as i32),
-
-            Instruction::PushFuncRef(func) => self.stack.borrow_mut().push_ref(Some(*func)),
-
-            Instruction::MemoryInit(data_idx) => {
-                let data = &self.module.datas()[data_idx.0 as usize];
-                assert!(
-                    matches!(data.mode, DataMode::Passive),
-                    "Can only init passive data"
-                );
-                let len = self.stack.borrow_mut().pop_u32() as usize;
-                let src = self.stack.borrow_mut().pop_u32() as usize;
-                let dst = self.stack.borrow_mut().pop_u32();
-                let data = &data.init[src..src + len];
-                self.memory.borrow_mut().fill_data(dst, data);
-            }
-            Instruction::DataDrop(_) => {}
-            Instruction::Memcpy => {
-                let len = self.stack.borrow_mut().pop_u32() as usize;
-                let src = self.stack.borrow_mut().pop_u32() as usize;
-                let dst = self.stack.borrow_mut().pop_u32() as usize;
-                self.memory.borrow_mut().cpy(src, dst, len);
-            }
-            Instruction::Memfill => {
-                let len = self.stack.borrow_mut().pop_u32() as usize;
-                let value = self.stack.borrow_mut().pop_u32() as u8;
-                let addr = self.stack.borrow_mut().pop_u32() as usize;
-                self.memory.borrow_mut().fill_value(len, addr, value);
-            }
-
-            Instruction::TableInit(element_idx, table_idx) => {
-                let elem = &self.module.elements()[element_idx.0 as usize];
-                let len = self.stack.borrow_mut().pop_u32() as usize;
-                let src = self.stack.borrow_mut().pop_u32() as usize;
-                let dst = self.stack.borrow_mut().pop_u32() as usize;
-                let inits = elem.init[src..src + len]
-                    .iter()
-                    .map(|init| self.run_expr(*init, || self.stack.borrow_mut().pop_ref()));
-                let mut tables = self.tables.borrow_mut();
-                let table = tables.table_mut(*table_idx);
-                for (i, func_ref) in inits.enumerate() {
-                    table.set(TableElementIdx(i + dst), func_ref);
-                }
-            }
-            Instruction::ElementDrop(_) => {}
-            _ => panic!("Instruction: {:?} not implemented ", instruction,),
+            Instruction::I32Extend8S => op!(self, { a: i32 }, i32 => extend_i32(a, 8)),
+            Instruction::I32Extend16S => op!(self, { a: i32 }, i32 => extend_i32(a, 16)),
+            Instruction::I64Extend8S => op!(self, { a: i64 }, i64 => extend_i64(a, 8)),
+            Instruction::I64Extend16S => op!(self, { a: i64 }, i64 => extend_i64(a, 16)),
+            Instruction::I64Extend32S => op!(self, { a: i64 }, i64 => extend_i64(a, 32)),
         }
     }
 }
+
+macro_rules! extend_int {
+    ($t:ty) => {
+        paste! {
+            fn [<extend_ $t>](value: $t, extend_by: usize) -> $t {
+                let mask = (1 << extend_by) - 1;
+                let sign_mask = 1 << (extend_by - 1);
+                let value = value & mask;
+                if value & sign_mask != 0 {
+                    value | !mask
+                } else {
+                    value
+                }
+            }
+        }
+    };
+}
+
+extend_int!(i32);
+extend_int!(i64);
